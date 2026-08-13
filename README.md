@@ -23,8 +23,38 @@ The dev server serves the app under the Pages base path: **http://localhost:5173
    contents of each file in `supabase/migrations/` in filename order, and run them one at
    a time. Order matters — later migrations reference earlier tables.
    Migrations are append-only: never edit one that has already been run, add a new one.
-3. **Enable email auth.** Authentication → Providers → Email: on. Magic links are not
-   used; the app signs in with the 6-digit OTP code from the same email template.
+3. **Enable email auth.** Authentication → Providers → Email: on.
+
+   **Set up custom SMTP before anything else.** Supabase's built-in mailer is capped at a
+   few messages an hour *and* locks email templates ("Set up custom SMTP to edit the
+   source"), and the template edit below is what makes sign-in work at all. Any provider
+   works; note that some (Resend) require a verified *domain*, while others (Brevo,
+   Mailjet) will verify a single sender *address*, which is easier if you do not own a
+   domain. Project Settings → Authentication → SMTP Settings: sender address and name,
+   host, port 587, username, password.
+
+   Then **change the Magic Link email template** — this is not optional. The app signs in
+   with a 6-digit code, but Supabase's default template for that email sends only a *link*
+   to `{{ .ConfirmationURL }}`. That link cannot work here: it returns the session tokens
+   in the URL fragment, and `HashRouter` rewrites the fragment before supabase-js can read
+   it, so the session is discarded and you land back on the sign-in page. Verified against
+   the deployed site. Under Authentication → Emails → Magic Link, replace the body with
+   the code itself:
+
+   ```html
+   <h2>Your Carbooker sign-in code</h2>
+   <p>Enter this code in the app:</p>
+   <p style="font-size:28px;letter-spacing:6px"><strong>{{ .Token }}</strong></p>
+   <p>If you didn't ask for it, ignore this email.</p>
+   ```
+
+   Also set Authentication → URL Configuration → Site URL to the deployed URL *including
+   the repo path*, e.g. `https://vdobritski.github.io/carbooker/`, so password-reset and
+   email-change links do not hit the same 404.
+
+   Once signup is working, turn **"Allow new users to sign up" off** under the email
+   provider. Every read policy is `using (true)` for signed-in users, so anyone able to
+   register can read every trip, seat and comment. Add people from the dashboard instead.
 4. **Copy the credentials.** Project Settings → API → copy the Project URL and the
    `anon` public key into `.env`:
 

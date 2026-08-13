@@ -40,6 +40,12 @@ tokens in the URL fragment, which collides with hash routing and with the Pages 
 OTP keeps the whole flow on one page and needs no redirect allow-listing. Same Supabase
 Auth, fewer moving parts.
 
+The catch, confirmed the hard way on the first live deploy: Supabase still sends its
+*Magic Link* template for `signInWithOtp`, and that template ships a link rather than the
+code. Left alone it sends people to the Site URL — the domain root, a 404 under a repo
+subpath. The template has to be edited to emit `{{ .Token }}`. See the setup steps in
+[../README.md](../README.md).
+
 **No state library, no data-fetching library.** Pages call `src/api/*` functions in
 `useEffect` and own their `loading` / `error` / `data` state. Session comes from one
 `AuthProvider` context. That's the whole state story. If a page ever needs more, that page
