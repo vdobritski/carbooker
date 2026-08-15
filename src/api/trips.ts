@@ -1,20 +1,24 @@
 import { supabase } from '../lib/supabase'
 import { listCars } from './cars'
 import { listTripBookings } from './bookings'
+import { getMyGroupRights } from './groups'
+import type { GroupRights } from './groups'
 import type {
   BookingWithOccupant,
   CarWithDriver,
   ParticipantWithProfile,
-  Role,
   Trip,
   TripRow,
+  TripWithGroup,
 } from '../lib/types'
 
-const COLUMNS = 'id, name, description, plan, starts_on, ends_on, created_by, created_at'
+const COLUMNS =
+  'id, group_id, name, description, plan, starts_on, ends_on, created_by, created_at'
 
 function toTrip(row: TripRow): Trip {
   return {
     id: row.id,
+    groupId: row.group_id,
     name: row.name,
     description: row.description,
     plan: row.plan,
@@ -33,10 +37,38 @@ export interface TripInput {
   endsOn?: string | null
 }
 
-export async function listTrips(): Promise<Trip[]> {
+interface TripJoinRow extends TripRow {
+  groups: { name: string } | null
+}
+
+/**
+ * The trips I can see - which is exactly the trips of the groups I am in. No
+ * `.eq('group_id', ...)`: the trips_select policy is the filter, and a client-side one as
+ * well would be a second source of truth.
+ */
+export async function listTrips(): Promise<TripWithGroup[]> {
+  const { data, error } = await supabase
+    .from('trips')
+    .select(`${COLUMNS}, groups (name)`)
+    .order('starts_on', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+
+  // Cast through unknown: without generated database types supabase-js infers the embedded
+  // group as an array, but PostgREST returns a single object for a many-to-one.
+  return (data as unknown as TripJoinRow[]).map((row) => ({
+    ...toTrip(row),
+    groupName: row.groups?.name ?? 'Unknown group',
+  }))
+}
+
+/** The trips of one group, for that group's page. */
+export async function listGroupTrips(groupId: string): Promise<Trip[]> {
   const { data, error } = await supabase
     .from('trips')
     .select(COLUMNS)
+    .eq('group_id', groupId)
     .order('starts_on', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true })
 
@@ -56,7 +88,14 @@ export async function getTrip(id: string): Promise<Trip | null> {
   return data ? toTrip(data as TripRow) : null
 }
 
-export async function createTrip(input: TripInput): Promise<Trip> {
+/**
+ * The group is a separate argument, not part of TripInput: it is fixed when the trip is
+ * made and updateTrip must never send it - the database refuses a move anyway.
+ *
+ * Unlike createGroup this keeps .select().single(): trips_select only asks whether I am a
+ * member of the group, which was true before the insert.
+ */
+export async function createTrip(groupId: string, input: TripInput): Promise<Trip> {
   const { data: sessionData } = await supabase.auth.getSession()
   const userId = sessionData.session?.user.id
   if (!userId) throw new Error('Not signed in')
@@ -64,6 +103,7 @@ export async function createTrip(input: TripInput): Promise<Trip> {
   const { data, error } = await supabase
     .from('trips')
     .insert({
+      group_id: groupId,
       name: input.name,
       description: input.description ?? null,
       plan: input.plan ?? null,
@@ -102,7 +142,9 @@ export async function deleteTrip(id: string): Promise<void> {
   const { data, error } = await supabase.from('trips').delete().eq('id', id).select('id')
   if (error) throw error
   if (!data || data.length === 0) {
-    throw new Error('Trip was not deleted - only its creator or an admin can do that.')
+    throw new Error(
+      'Trip was not deleted - that needs to be your own trip, or "can manage anyone\'s trip" in the group.',
+    )
   }
 }
 
@@ -113,12 +155,16 @@ export interface TripBoard {
   cars: CarWithDriver[]
   participants: ParticipantWithProfile[]
   bookings: BookingWithOccupant[]
+  /** My switches in the trip's group. Null when I am not a member - a site admin reading. */
+  myGroupRights: GroupRights | null
 }
 
 /**
  * Everything the trip page draws, in four parallel queries - never one per car or per
  * seat. Seat counts, the layout and the unseated list are all derived from this one
  * result, so they cannot disagree with each other.
+ *
+ * The fifth query has to wait for the first: which group to ask about is on the trip.
  *
  * The import of listTripBookings alongside bookings.ts importing joinTrip is a cycle, but
  * a harmless one: both sides are hoisted function declarations, and nothing runs at module
@@ -133,7 +179,9 @@ export async function getTripBoard(tripId: string): Promise<TripBoard | null> {
   ])
 
   if (!trip) return null
-  return { trip, cars, participants, bookings }
+
+  const myGroupRights = await getMyGroupRights(trip.groupId)
+  return { trip, cars, participants, bookings, myGroupRights }
 }
 
 // --- participants ----------------------------------------------------------
@@ -144,15 +192,15 @@ interface ParticipantJoinRow {
   profiles: {
     display_name: string
     photo_url: string | null
-    role: Role
   } | null
 }
 
 export async function listParticipants(tripId: string): Promise<ParticipantWithProfile[]> {
-  // One query with the profile joined in, not one lookup per participant.
+  // One query with the profile joined in, not one lookup per participant. The profile is
+  // readable because a participant is a member of the trip's group, and so is the viewer.
   const { data, error } = await supabase
     .from('trip_participants')
-    .select('profile_id, joined_at, profiles (display_name, photo_url, role)')
+    .select('profile_id, joined_at, profiles (display_name, photo_url)')
     .eq('trip_id', tripId)
     .order('joined_at', { ascending: true })
 
@@ -166,7 +214,6 @@ export async function listParticipants(tripId: string): Promise<ParticipantWithP
     joinedAt: row.joined_at,
     displayName: row.profiles?.display_name ?? 'Unknown',
     photoUrl: row.profiles?.photo_url ?? null,
-    role: row.profiles?.role ?? 'user',
   }))
 }
 

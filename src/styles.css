@@ -108,6 +108,11 @@ button.link {
   white-space: pre-wrap;
 }
 
+/* An invite link is one long unbreakable word, and it has to stay on the screen. */
+.invite-link {
+  overflow-wrap: anywhere;
+}
+
 .row {
   display: flex;
   gap: 0.5rem;

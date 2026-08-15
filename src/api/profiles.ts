@@ -34,7 +34,11 @@ export async function getMyProfile(): Promise<Profile | null> {
   return data ? toProfile(data as ProfileRow) : null
 }
 
-/** Everyone, for the admin page. Any signed-in user may read profiles. */
+/**
+ * Everyone, for the admin page - and only there. Since 017 profiles_select shows a person
+ * themselves, whoever they share a group with, and everything to a site admin, so for
+ * anybody else this returns their own groups rather than the whole database.
+ */
 export async function listProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')

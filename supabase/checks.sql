@@ -4,6 +4,10 @@
 -- bookings, cars or seats. It must return ZERO ROWS. Anything it returns is a real
 -- inconsistency: the `problem` column says which rule broke and `offender` points at the row.
 --
+-- Two labels start with WARNING:. Those are states that are legitimate for a while -
+-- a group whose owner deleted their account, a car whose driver was flipped back to
+-- passenger - and want a human decision, not a bug report.
+--
 -- It is one query on purpose - the SQL editor only shows the last result set, so a file of
 -- separate queries would quietly report just the last one.
 --
@@ -88,6 +92,96 @@ select * from (
   select 'car on a trip that does not exist', c.id::text
     from cars c
    where not exists (select 1 from trips t where t.id = c.trip_id)
+
+  -- ---------------------------------------------------------------------------
+  -- The group boundary (task 20). Rows below mean somebody can see, or is sitting
+  -- in, something outside their group.
+  --
+  -- Most of these are guaranteed today by guard_group_membership() refusing to
+  -- remove anybody still holding a seat or a car, and by guard_group_owner().
+  -- They are here to catch a future change that quietly drops one of those rules.
+  -- ---------------------------------------------------------------------------
+
+  union all
+
+  select 'trip belongs to a group that does not exist', t.id::text
+    from trips t
+   where not exists (select 1 from groups g where g.id = t.group_id)
+
+  union all
+
+  select 'group owner is not a member of it', g.name
+    from groups g
+   where g.owner_id is not null
+     and not exists (
+       select 1 from group_members m
+        where m.group_id = g.id and m.profile_id = g.owner_id
+     )
+
+  union all
+
+  -- Legitimate right after the owner's account is deleted: the group survives so its
+  -- trips do. A site admin should hand it to somebody.
+  select 'WARNING: group has no owner', g.name
+    from groups g
+   where g.owner_id is null
+
+  union all
+
+  select 'seat occupant is not in the trip group', b.id::text
+    from bookings b
+    join trips t on t.id = b.trip_id
+   where b.profile_id is not null
+     and not exists (
+       select 1 from group_members m
+        where m.group_id = t.group_id and m.profile_id = b.profile_id
+     )
+
+  union all
+
+  -- Catches a +1 whose host has left the group: the guest has no membership of its
+  -- own, so this is the only thing that would notice.
+  select 'seat was booked by somebody not in the trip group', b.id::text
+    from bookings b
+    join trips t on t.id = b.trip_id
+   where not exists (
+     select 1 from group_members m
+      where m.group_id = t.group_id and m.profile_id = b.booked_by
+   )
+
+  union all
+
+  -- Nothing stops a member manager flipping a driver back to passenger while their car
+  -- is still on a trip - by decision, not by oversight. Move the car's seats, or delete
+  -- the car.
+  select 'WARNING: car driver no longer drives in that group', c.title
+    from cars c
+    join trips t on t.id = c.trip_id
+   where not exists (
+     select 1 from group_members m
+      where m.group_id = t.group_id
+        and m.profile_id = c.driver_id
+        and m.travel_role = 'driver'
+   )
+
+  union all
+
+  select 'trip participant is not in the trip group', p.trip_id::text || ' / ' || p.profile_id::text
+    from trip_participants p
+    join trips t on t.id = p.trip_id
+   where not exists (
+     select 1 from group_members m
+      where m.group_id = t.group_id and m.profile_id = p.profile_id
+   )
+
+  union all
+
+  select 'join request for a group they are already in', r.group_id::text || ' / ' || r.profile_id::text
+    from group_join_requests r
+   where exists (
+     select 1 from group_members m
+      where m.group_id = r.group_id and m.profile_id = r.profile_id
+   )
 
 ) problems
 order by problem, offender;

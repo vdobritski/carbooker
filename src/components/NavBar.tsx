@@ -14,6 +14,7 @@ export default function NavBar() {
     <nav className="navbar">
       <Link to="/trips">Carbooker</Link>
       <span className="spacer" />
+      <Link to="/groups">Groups</Link>
       {profile?.role === 'admin' && <Link to="/admin">People</Link>}
       <Link to="/me">{profile?.displayName ?? session?.user.email ?? 'Me'}</Link>
       <button type="button" onClick={handleSignOut}>

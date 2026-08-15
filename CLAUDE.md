@@ -92,6 +92,10 @@ There is no test suite. "Verified" means:
 - `npm run build` passes with no TypeScript errors
 - the change was exercised in the running app (`npm run dev`) along its happy path and
   the one or two failure paths that matter
-- for booking changes: the SQL checks in [docs/tasks/12-booking-consistency-checks.md](docs/tasks/12-booking-consistency-checks.md) return zero rows
+- for changes to bookings, **or to groups, trips or membership**: `supabase/checks.sql`
+  returns zero rows. It covers the four booking invariants and the group boundary — see
+  [docs/tasks/12](docs/tasks/12-booking-consistency-checks.md) and
+  [docs/tasks/20](docs/tasks/20-group-consistency-checks.md). Rows labelled `WARNING:` are
+  states that want a decision rather than a fix.
 
 Say what was actually checked. Do not report a change as working if it was only compiled.

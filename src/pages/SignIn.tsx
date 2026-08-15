@@ -59,6 +59,12 @@ export default function SignIn() {
     <main>
       <h1>Carbooker</h1>
 
+      {/* An invite link is behind the sign-in check, and following it while signed out
+          loses the token. Say so here rather than build a redirect-back for one screen. */}
+      <p className="muted">
+        Following an invite link? Sign in here first, then open the link again.
+      </p>
+
       {!sent ? (
         <form onSubmit={sendCode}>
           <label htmlFor="email">Your email</label>

@@ -34,7 +34,6 @@ export default function ParticipantList({
             {p.displayName}
             {p.profileId === currentUserId && <span className="muted"> (you)</span>}
             {p.profileId === creatorId && <span className="badge">organiser</span>}
-            {p.role === 'driver' && <span className="badge">driver</span>}
           </span>
 
           <span className="spacer" />

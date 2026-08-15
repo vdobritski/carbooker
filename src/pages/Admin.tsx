@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { listProfiles, setRole } from '../api/profiles'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../lib/errors'
 import type { Profile, Role } from '../lib/types'
 
-const ROLES: Role[] = ['user', 'driver', 'admin']
+// Two site roles since 017. Driving moved to group_members.travel_role.
+const ROLES: Role[] = ['user', 'admin']
 
 export default function Admin() {
   const { profile, loading, refreshProfile } = useAuth()
@@ -67,8 +68,9 @@ export default function Admin() {
     <main>
       <h1>People</h1>
       <p className="muted">
-        Drivers can register a car on a trip. Admins can do anything. A change reaches
-        someone the next time their page loads.
+        Admins can do anything, anywhere. Everything else — who drives, who runs trips, who
+        manages people — is set per group on <Link to="/groups">Groups</Link>. A change
+        reaches someone the next time their page loads.
       </p>
 
       {people === null && !error && <p className="muted">Loading…</p>}

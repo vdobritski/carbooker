@@ -21,8 +21,9 @@ async function currentUserId(): Promise<string> {
 }
 
 /**
- * Only my own +1s. Everyone can *read* every guest - a driver needs the name of the +1 in
- * their car - so this filter is what scopes the profile page, not the policy.
+ * Only my own +1s. The policy would allow the +1s of everyone I share a group with too
+ * (017), so this filter is still what scopes the profile page - it is just no longer the
+ * only thing standing between me and a stranger's guest list.
  */
 export async function listMyGuests(): Promise<Guest[]> {
   const userId = await currentUserId()
@@ -39,7 +40,9 @@ export async function listMyGuests(): Promise<Guest[]> {
 
 /**
  * Everyone's +1s for a given set of hosts - what a driver needs to seat somebody else's
- * guest. The select policy is open precisely so this works.
+ * guest. The hosts are participants of the trip, so members of its group, so
+ * shares_group_with(host_id) makes their guests readable (017). Passing in the id of
+ * somebody outside my groups returns nothing rather than failing.
  */
 export async function listGuestsByHosts(hostIds: string[]): Promise<Guest[]> {
   if (hostIds.length === 0) return []

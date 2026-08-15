@@ -5,6 +5,9 @@ import Trips from './pages/Trips'
 import TripDetail from './pages/TripDetail'
 import CarDetail from './pages/CarDetail'
 import CarForm from './pages/CarForm'
+import Groups from './pages/Groups'
+import GroupDetail from './pages/GroupDetail'
+import JoinGroup from './pages/JoinGroup'
 import Profile from './pages/Profile'
 import Admin from './pages/Admin'
 
@@ -21,6 +24,9 @@ export default function AppRoutes() {
           <Route path="/trips/:id/cars/new" element={<CarForm />} />
           <Route path="/trips/:id/cars/:carId" element={<CarDetail />} />
           <Route path="/trips/:id/cars/:carId/edit" element={<CarForm />} />
+          <Route path="/groups" element={<Groups />} />
+          <Route path="/groups/:id" element={<GroupDetail />} />
+          <Route path="/join/:token" element={<JoinGroup />} />
           <Route path="/me" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
         </Route>

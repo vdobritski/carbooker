@@ -88,12 +88,18 @@ export default function TripDetail() {
     )
   }
 
-  const { trip, cars, participants, bookings } = board
+  const { trip, cars, participants, bookings, myGroupRights } = board
 
   const currentUserId = session?.user.id ?? null
   const isAdmin = profile?.role === 'admin'
-  const canManage = isAdmin || trip.createdBy === currentUserId
-  const canRegisterCar = profile?.role === 'driver' || isAdmin
+  // The branches of the trips_update policy, in the same order: my own trip, or
+  // can_manage_trips_in() - which is the switch, the group owner, and a site admin.
+  const canManageInGroup =
+    myGroupRights?.canManageTrips === true || myGroupRights?.isOwner === true || isAdmin
+  const canManage = trip.createdBy === currentUserId || canManageInGroup
+  // Driving is a property of my membership of this trip's group, not of my site role -
+  // the cars_insert policy asks can_drive_in_group(), which folds in site admins.
+  const canRegisterCar = myGroupRights?.travelRole === 'driver' || isAdmin
   const isParticipant = participants.some((p) => p.profileId === currentUserId)
   const iHoldSeat = bookings.some(
     (b) => b.profileId === currentUserId && b.status !== 'denied',
