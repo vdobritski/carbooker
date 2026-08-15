@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { updateMyProfile } from '../api/profiles'
 import GuestSection from '../components/GuestSection'
+import PasswordSection from '../components/PasswordSection'
 import SavedCarSection from '../components/SavedCarSection'
 import { errorMessage } from '../lib/errors'
 
@@ -101,6 +102,8 @@ export default function Profile() {
       <GuestSection />
 
       <SavedCarSection />
+
+      <PasswordSection />
     </main>
   )
 }

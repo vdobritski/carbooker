@@ -618,6 +618,58 @@ form .muted {
 
 /* ---------- misc ---------- */
 
+/* A success or explanatory message. The counterpart to .error - same shape, different
+ * weight, so neither is a colour-only signal. */
+.notice {
+  display: block;
+  margin: var(--s-3) 0;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--ok);
+  border-left-width: 4px;
+  border-radius: var(--r-sm);
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-size: var(--text-sm);
+}
+
+/* Segmented control for the sign-in methods. */
+.tabs {
+  display: flex;
+  gap: var(--s-1);
+  margin-top: var(--s-5);
+  padding: var(--s-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.tabs .tab {
+  flex: 1;
+  margin: 0;
+  padding: var(--s-2) var(--s-1);
+  min-height: 2.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.tabs .tab:hover:not(.is-active) {
+  background: var(--surface);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.tabs .tab.is-active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
 /* Sign-in is the only screen with no nav above it and one thing to do, so it gets the
  * centred-card treatment rather than sitting at the top-left of an empty page. */
 .auth {
