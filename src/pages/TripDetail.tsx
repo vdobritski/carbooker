@@ -217,7 +217,7 @@ export default function TripDetail() {
           <label htmlFor="plan">Plan</label>
           <textarea id="plan" rows={6} value={plan} onChange={(e) => setPlan(e.target.value)} />
 
-          <button type="submit" disabled={busy}>
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className="link" onClick={() => setEditing(false)}>
@@ -289,7 +289,11 @@ export default function TripDetail() {
         </ul>
       )}
 
-      {canRegisterCar && <Link to={`/trips/${trip.id}/cars/new`}>Register my car</Link>}
+      {canRegisterCar && (
+        <Link className="action" to={`/trips/${trip.id}/cars/new`}>
+          Register my car
+        </Link>
+      )}
 
       <h2>Not in a car yet ({unseated.length})</h2>
 

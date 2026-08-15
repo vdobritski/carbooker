@@ -200,7 +200,7 @@ export default function CarForm() {
           </label>
         )}
 
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           {busy ? 'Saving…' : editing ? 'Save' : 'Register car'}
         </button>
       </form>

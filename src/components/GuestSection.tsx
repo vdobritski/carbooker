@@ -120,7 +120,7 @@ export default function GuestSection() {
                   value={editNote}
                   onChange={(e) => setEditNote(e.target.value)}
                 />
-                <button type="submit" disabled={busy}>
+                <button type="submit" className="primary" disabled={busy}>
                   Save
                 </button>
                 <button type="button" className="link" onClick={() => setEditingId(null)}>
@@ -164,7 +164,7 @@ export default function GuestSection() {
           onChange={(e) => setNote(e.target.value)}
         />
 
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           Add
         </button>
       </form>

@@ -168,7 +168,7 @@ export default function Trips() {
             <label htmlFor="plan">Plan</label>
             <textarea id="plan" rows={5} value={plan} onChange={(e) => setPlan(e.target.value)} />
 
-            <button type="submit" disabled={busy || !groupId}>
+            <button type="submit" className="primary" disabled={busy || !groupId}>
               {busy ? 'Creating…' : 'Create trip'}
             </button>
             <button type="button" className="link" onClick={() => setShowForm(false)}>

@@ -56,8 +56,9 @@ export default function SignIn() {
   }
 
   return (
-    <main>
+    <main className="auth">
       <h1>Carbooker</h1>
+      <p className="lede">Seats in each other&rsquo;s cars, sorted before you set off.</p>
 
       {/* An invite link is behind the sign-in check, and following it while signed out
           loses the token. Say so here rather than build a redirect-back for one screen. */}
@@ -76,7 +77,7 @@ export default function SignIn() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <button type="submit" disabled={busy}>
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Sending…' : 'Send code'}
           </button>
         </form>
@@ -92,7 +93,7 @@ export default function SignIn() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
           />
-          <button type="submit" disabled={busy}>
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Checking…' : 'Sign in'}
           </button>
           <button

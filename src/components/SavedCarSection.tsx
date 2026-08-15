@@ -145,7 +145,7 @@ export default function SavedCarSection() {
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                 />
-                <button type="submit" disabled={busy}>
+                <button type="submit" className="primary" disabled={busy}>
                   Save
                 </button>
                 <button type="button" className="link" onClick={() => setEditingId(null)}>
@@ -213,7 +213,7 @@ export default function SavedCarSection() {
           onChange={(e) => setDescription(e.target.value)}
         />
 
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           Add
         </button>
       </form>

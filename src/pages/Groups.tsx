@@ -95,7 +95,7 @@ export default function Groups() {
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          <button type="submit" disabled={busy}>
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Creating…' : 'Create group'}
           </button>
           <button type="button" className="link" onClick={() => setShowForm(false)}>

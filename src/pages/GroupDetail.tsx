@@ -348,7 +348,7 @@ export default function GroupDetail() {
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          <button type="submit" disabled={busy}>
+          <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className="link" onClick={cancelEdit}>

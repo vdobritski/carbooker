@@ -86,7 +86,7 @@ export default function Profile() {
           Role: <strong>{profile.role}</strong> — only an admin can change this.
         </p>
 
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           {busy ? 'Saving…' : 'Save'}
         </button>
       </form>
