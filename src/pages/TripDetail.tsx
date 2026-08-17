@@ -34,6 +34,8 @@ export default function TripDetail() {
   const [busy, setBusy] = useState(false)
   const [peopleBusy, setPeopleBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  /** A read that failed, as opposed to a trip that is not there. Kept apart on purpose. */
+  const [loadFailure, setLoadFailure] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [startsOn, setStartsOn] = useState('')
@@ -47,9 +49,12 @@ export default function TripDetail() {
     if (!id) return
     try {
       setBoard(await getTripBoard(id))
+      setLoadFailure(null)
     } catch (err: unknown) {
-      setBoard(null)
-      setError(errorMessage(err))
+      // Not setBoard(null): null is what this page renders as "Trip not found", so a
+      // dropped request after a successful write used to tell a member the trip was gone.
+      // A failed read keeps whatever is on screen and says so.
+      setLoadFailure(errorMessage(err))
     }
   }, [id])
 
@@ -69,6 +74,25 @@ export default function TripDetail() {
     setPlan(board.trip.plan ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId])
+
+  // Nothing loaded and the read failed - distinct from a trip that is not there.
+  if (board === undefined && loadFailure !== null) {
+    return (
+      <main>
+        <h1>Could not load this trip</h1>
+        <p className="muted">
+          Something went wrong reading it. This does not mean the trip is gone.
+        </p>
+        <p className="error">{loadFailure}</p>
+        <div className="row">
+          <button type="button" className="primary" onClick={() => void loadBoard()}>
+            Try again
+          </button>
+          <Link to="/trips">Back to trips</Link>
+        </div>
+      </main>
+    )
+  }
 
   if (board === undefined) {
     return (
@@ -428,6 +452,13 @@ export default function TripDetail() {
         </div>
       )}
 
+      {/* Still showing the last successful load - say it may be stale rather than claiming
+          the trip is gone. */}
+      {loadFailure && (
+        <p className="error">
+          Could not refresh this page, so what you see may be out of date. {loadFailure}
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
     </main>
   )

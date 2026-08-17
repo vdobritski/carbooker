@@ -50,6 +50,8 @@ export default function GroupDetail() {
   const [members, setMembers] = useState<GroupMemberWithProfile[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [error, setError] = useState<string | null>(null)
+  /** A read that failed, as opposed to a group that is not there. Kept apart on purpose. */
+  const [loadFailure, setLoadFailure] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -101,9 +103,13 @@ export default function GroupDetail() {
         setMine(nextMine)
       }
       setGroup(found)
+      setLoadFailure(null)
     } catch (err: unknown) {
-      setGroup(null)
-      setError(errorMessage(err))
+      // A failed read is a failed read. setGroup(null) here would be a lie - null is what
+      // this page renders as "no such group, or you are not in it", so one dropped request
+      // after a successful write used to tell an owner they were not a member of their own
+      // group. Leave whatever is on screen and say what actually happened.
+      setLoadFailure(errorMessage(err))
     }
   }, [id])
 
@@ -130,6 +136,25 @@ export default function GroupDetail() {
     }
     setError(null)
     setEditing(false)
+  }
+
+  // Nothing loaded and the read failed - the only case where the page has nothing to show.
+  if (group === undefined && loadFailure !== null) {
+    return (
+      <main>
+        <h1>Could not load this group</h1>
+        <p className="muted">
+          Something went wrong reading it. This does not mean the group is gone.
+        </p>
+        <p className="error">{loadFailure}</p>
+        <div className="row">
+          <button type="button" className="primary" onClick={() => void load()}>
+            Try again
+          </button>
+          <Link to="/groups">Back to groups</Link>
+        </div>
+      </main>
+    )
   }
 
   if (group === undefined) {
@@ -563,6 +588,13 @@ export default function GroupDetail() {
         </>
       )}
 
+      {/* The page is still showing what it last loaded successfully - say it may be stale
+          rather than replacing it with a "not found" that is not true. */}
+      {loadFailure && (
+        <p className="error">
+          Could not refresh this page, so what you see may be out of date. {loadFailure}
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
     </main>
   )
