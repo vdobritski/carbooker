@@ -1,5 +1,17 @@
 import type { GroupRights } from '../api/groups'
-import type { Trip } from './types'
+import type { Car, Trip } from './types'
+
+/**
+ * "Is this my car?" — the client-side mirror of `owns_car(uuid)`.
+ *
+ * Since 023 a car can be driven by a name rather than an account, and then `driverId` is
+ * null. A bare `car.driverId === userId` would answer "yes" for a signed-out viewer, both
+ * sides being null, so the comparison lives here instead of being written out per screen.
+ * Nobody owns a car driven by a name: only whoever runs the trip manages it.
+ */
+export function drivesCar(car: Pick<Car, 'driverId'>, userId: string | null): boolean {
+  return userId !== null && car.driverId === userId
+}
 
 /**
  * "May I run this trip?" — the client-side mirror of the `manages_trip(uuid)` SQL helper.

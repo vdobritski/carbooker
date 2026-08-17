@@ -133,11 +133,13 @@ export interface Guest {
   createdAt: string
 }
 
-// 005_cars.sql
+// 005_cars.sql, driver_name added by 023_assigned_drivers.sql
 export interface CarRow {
   id: string
   trip_id: string
-  driver_id: string
+  /** Null when the driver has no account - then driver_name carries them. */
+  driver_id: string | null
+  driver_name: string | null
   title: string
   description: string | null
   features: string[]
@@ -148,7 +150,11 @@ export interface CarRow {
 export interface Car {
   id: string
   tripId: string
-  driverId: string
+  /**
+   * The driver's account, or null for a car driven by somebody with no account. Null also
+   * means nobody has the driver's powers over this car - only whoever runs the trip does.
+   */
+  driverId: string | null
   title: string
   description: string | null
   features: string[]
@@ -157,7 +163,11 @@ export interface Car {
   createdAt: string
 }
 
-/** How the UI always reads a car: nobody wants a bare driver_id on screen. */
+/**
+ * How the UI always reads a car: nobody wants a bare driver_id on screen. driverName is
+ * the profile's display name, or the typed-in name when there is no profile - the screen
+ * shows a driver either way, and `driverId === null` is what tells the two apart.
+ */
 export interface CarWithDriver extends Car {
   driverName: string
   driverPhotoUrl: string | null

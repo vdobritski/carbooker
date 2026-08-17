@@ -247,7 +247,8 @@ Primary key `(trip_id, profile_id)`.
 |---|---|---|
 | `id` | uuid PK | |
 | `trip_id` | uuid not null | `references trips(id) on delete cascade` |
-| `driver_id` | uuid not null | `references profiles(id) on delete cascade` |
+| `driver_id` | uuid | `references profiles(id) on delete cascade` — null when the driver has no account (**023**) |
+| `driver_name` | text | the driver's name when there is no account (**023**) |
 | `title` | text not null | e.g. "Ivan's blue Passat" |
 | `description` | text | |
 | `features` | text[] not null default `'{}'` | `{fridge, grill, opening roof}` |
@@ -256,6 +257,16 @@ Primary key `(trip_id, profile_id)`.
 
 `features` is a plain `text[]`. No feature table, no join table — it is a list of words
 shown as chips.
+
+`check (cars_driver_one_of)`: exactly one of `driver_id` / `driver_name` is set. **023**
+split the driver from whoever registered the car, so one person can run a trip whose cars
+are not all theirs. Two consequences worth stating:
+
+- naming another member hands them the driver's powers over that car (`owns_car`), because
+  `owns_car` is `driver_id = auth.uid()` and nothing else;
+- a `driver_name` car is owned by nobody — `owns_car` is false for everyone — so it is
+  managed entirely through `manages_trip`. That is why only somebody who runs the trip may
+  create one: a plain driver who registered a car under a name would lose control of it.
 
 A car belongs to exactly one trip, and `trip_id` stays `not null`. Reusing one `cars` row
 across trips would make `seat_count` — the number invariant 3 is stated against — shared
@@ -401,7 +412,10 @@ lookup re-enters the policy and recurses.
 
 ```sql
 is_admin()                 -- profiles.role = 'admin'; site-wide
-owns_car(car)              -- cars.driver_id = auth.uid(); one specific car
+owns_car(car)              -- cars.driver_id = auth.uid(); one specific car. False for
+                           -- everybody on a car driven by a name (023)
+group_has_member(g, p)     -- is *that person* in g; the only helper that asks about
+                           -- somebody other than the caller (023)
 drives_on_trip(trip)       -- I drive some car on this trip
 trip_group(trip)           -- the group a trip belongs to; lets cars/bookings/participants
                            -- policies stay one-liners
@@ -436,7 +450,7 @@ an owner who drives ticks their own travel role like anybody else.
 | `group_join_requests` | self, or `can_manage_members_in` | `profile_id = auth.uid()` and `status='pending'` | `can_manage_members_in` | self, or `can_manage_members_in` |
 | `trips` | `is_group_member(group_id)` | `created_by = auth.uid()` and `can_create_trips_in(group_id)` | `created_by = auth.uid()`, or `can_manage_trips_in(group_id)` | same as update |
 | `trip_participants` | `is_group_member(trip_group(trip_id))` | self and member, or `manages_trip(trip_id)` | — | self, or `manages_trip(trip_id)` |
-| `cars` | `is_group_member(trip_group(trip_id))` | `driver_id = auth.uid()` and `can_drive_in_group(trip_group(trip_id))` | driver, or `manages_trip` | driver, or `manages_trip` |
+| `cars` | `is_group_member(trip_group(trip_id))` | `driver_id = auth.uid()` and `can_drive_in_group(...)` — **or** `manages_trip(trip_id)`, which is what allows naming somebody else (**023**) | driver, or `manages_trip` | driver, or `manages_trip` |
 | `bookings` | `is_group_member(trip_group(trip_id))` | member, and `booked_by = auth.uid()` with occupant self or own guest — or `owns_car(car_id)`, or `manages_trip` | see below | `booked_by = auth.uid()`, or `manages_trip` |
 
 `groups` update is owner-only for a reason beyond taste: `owner_id` lives on that row, so

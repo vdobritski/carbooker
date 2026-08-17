@@ -2,12 +2,13 @@ import { supabase } from '../lib/supabase'
 import type { CarWithDriver } from '../lib/types'
 
 const COLUMNS =
-  'id, trip_id, driver_id, title, description, features, seat_count, created_at, profiles (display_name, photo_url)'
+  'id, trip_id, driver_id, driver_name, title, description, features, seat_count, created_at, profiles (display_name, photo_url)'
 
 interface CarJoinRow {
   id: string
   trip_id: string
-  driver_id: string
+  driver_id: string | null
+  driver_name: string | null
   title: string
   description: string | null
   features: string[]
@@ -26,9 +27,26 @@ function toCar(row: CarJoinRow): CarWithDriver {
     features: row.features ?? [],
     seatCount: row.seat_count,
     createdAt: row.created_at,
-    driverName: row.profiles?.display_name ?? 'Unknown',
+    // The embed is null when driver_id is, so the typed-in name takes over. 'Unknown' is
+    // now only reachable if the profile itself is unreadable, which the group policies
+    // make unlikely - a car and its driver are in the same group as the viewer.
+    driverName: row.profiles?.display_name ?? row.driver_name ?? 'Unknown',
     driverPhotoUrl: row.profiles?.photo_url ?? null,
   }
+}
+
+/**
+ * Who drives. Either a member of the trip's group or a plain name - the database has a
+ * check constraint saying exactly one, and this shape is that constraint in TypeScript, so
+ * "both set" is not a state the app can build by accident.
+ */
+export type CarDriver = { kind: 'member'; profileId: string } | { kind: 'name'; name: string }
+
+/** The driver columns for an insert or update, from the one field the UI actually holds. */
+function driverColumns(driver: CarDriver): { driver_id: string | null; driver_name: string | null } {
+  return driver.kind === 'member'
+    ? { driver_id: driver.profileId, driver_name: null }
+    : { driver_id: null, driver_name: driver.name }
 }
 
 export interface CarInput {
@@ -36,6 +54,7 @@ export interface CarInput {
   description?: string | null
   features: string[]
   seatCount: number
+  driver: CarDriver
 }
 
 /** Splits the comma-separated feature input. Empty input gives [], never ['']. */
@@ -68,16 +87,17 @@ export async function getCar(id: string): Promise<CarWithDriver | null> {
   return data ? toCar(data as unknown as CarJoinRow) : null
 }
 
+/**
+ * Registering my own car needs the group's driver switch; naming anybody else needs to run
+ * the trip. Both are the cars_insert policy's job - sending a driver the caller may not set
+ * comes back as a refusal, not as a car with the wrong driver.
+ */
 export async function createCar(tripId: string, input: CarInput): Promise<CarWithDriver> {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const userId = sessionData.session?.user.id
-  if (!userId) throw new Error('Not signed in')
-
   const { data, error } = await supabase
     .from('cars')
     .insert({
       trip_id: tripId,
-      driver_id: userId,
+      ...driverColumns(input.driver),
       title: input.title,
       description: input.description ?? null,
       features: input.features,
@@ -91,10 +111,13 @@ export async function createCar(tripId: string, input: CarInput): Promise<CarWit
 }
 
 export async function updateCar(id: string, patch: CarInput): Promise<CarWithDriver> {
-  // .single() throws on zero rows, which is how an RLS refusal arrives.
+  // .single() throws on zero rows, which is how an RLS refusal arrives. Changing the driver
+  // is refused by guard_car_identity() instead, with a message, because the update policy
+  // lets the car's own driver reach the row and only the trip's managers may hand it on.
   const { data, error } = await supabase
     .from('cars')
     .update({
+      ...driverColumns(patch.driver),
       title: patch.title,
       description: patch.description ?? null,
       features: patch.features,

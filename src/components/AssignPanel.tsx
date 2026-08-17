@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { confirmBooking, createAndAssign, listTripBookings } from '../api/bookings'
-import { listGuestsByHosts } from '../api/guests'
+import { createGuest, deleteGuest, listGuestsByHosts } from '../api/guests'
 import { listParticipants } from '../api/trips'
 import { errorMessage } from '../lib/errors'
 import type { BookingWithOccupant, Guest, ParticipantWithProfile } from '../lib/types'
@@ -29,6 +29,7 @@ export default function AssignPanel({
   const [bookings, setBookings] = useState<BookingWithOccupant[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -74,6 +75,33 @@ export default function AssignPanel({
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * A passenger who has no account: a guest, hosted by whoever is doing the seating. That
+   * host is what makes the row readable and removable later - a guest with no host is not a
+   * shape the schema has - so adding somebody by name means taking responsibility for them.
+   *
+   * Two writes, and the second one can be refused (a full car, a seat the policy will not
+   * allow). Undoing the first is worth the four lines: without it, retrying after a refusal
+   * leaves a second guest of the same name in the host's list, and then a third.
+   */
+  async function addByName() {
+    const name = newName.trim()
+    if (!name) return
+    await run(async () => {
+      const guest = await createGuest({ name })
+      try {
+        await createAndAssign({ tripId, carId, guestId: guest.id })
+      } catch (err: unknown) {
+        await deleteGuest(guest.id).catch(() => {
+          // Reporting the seating failure matters more than this one; the leftover is a
+          // name on the profile page, which is removable there.
+        })
+        throw err
+      }
+      setNewName('')
+    })
   }
 
   return (
@@ -148,6 +176,37 @@ export default function AssignPanel({
           </ul>
         </>
       )}
+
+      <p className="muted">Somebody without an account</p>
+      <div className="row">
+        <input
+          aria-label="Passenger's name"
+          placeholder="Uncle Bob"
+          value={newName}
+          disabled={busy || full}
+          onChange={(e) => setNewName(e.target.value)}
+          // Enter inside a form would submit it; this panel is not in one, but the page it
+          // sits on may grow one later.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              void addByName()
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="primary"
+          disabled={busy || full || newName.trim() === ''}
+          onClick={() => void addByName()}
+        >
+          Seat them
+        </button>
+      </div>
+      <span className="muted">
+        Seats a name, with no invitation and no sign-in. They show up as your +1, and you can
+        take them out again from this car.
+      </span>
 
       {error && <p className="error">{error}</p>}
     </section>

@@ -13,7 +13,7 @@ import type { GroupRights } from '../api/groups'
 import { useAuth } from '../auth/AuthProvider'
 import AssignPanel from '../components/AssignPanel'
 import type { BookingWithOccupant, CarWithDriver, Trip } from '../lib/types'
-import { managesTrip } from '../lib/authority'
+import { drivesCar, managesTrip } from '../lib/authority'
 import { errorMessage } from '../lib/errors'
 
 export default function CarDetail() {
@@ -138,7 +138,7 @@ export default function CarDetail() {
   const currentUserId = session?.user.id ?? null
   const isAdmin = profile?.role === 'admin'
   const canManage =
-    car.driverId === currentUserId ||
+    drivesCar(car, currentUserId) ||
     (trip !== null && managesTrip(trip, rights, currentUserId, isAdmin)) ||
     isAdmin
 
@@ -164,7 +164,8 @@ export default function CarDetail() {
 
       <h1>{car.title}</h1>
       <p className="muted">
-        Driven by {car.driverName} · {car.seatCount} passenger seats
+        Driven by {car.driverName}
+        {car.driverId === null && ' (no account)'} · {car.seatCount} passenger seats
       </p>
 
       {car.description && <p>{car.description}</p>}

@@ -1,3 +1,4 @@
+import { drivesCar } from '../lib/authority'
 import type { BookingWithOccupant, CarWithDriver } from '../lib/types'
 
 interface Props {
@@ -24,7 +25,7 @@ export default function SeatGrid({ car, seats, hostName, currentUserId, isAdmin 
         // booked the seat, its occupant, and admins.
         const mayReadComment =
           isAdmin ||
-          car.driverId === currentUserId ||
+          drivesCar(car, currentUserId) ||
           seat.bookedBy === currentUserId ||
           seat.profileId === currentUserId
 

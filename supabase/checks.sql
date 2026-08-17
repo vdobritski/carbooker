@@ -154,15 +154,39 @@ select * from (
   -- Nothing stops a member manager flipping a driver back to passenger while their car
   -- is still on a trip - by decision, not by oversight. Move the car's seats, or delete
   -- the car.
+  --
+  -- Since 023 there is a second way to land here, and it is not a mistake either: a trip
+  -- manager may name any member as a car's driver without touching the group's driver
+  -- switch. Same question for a human, so the same warning - "this car is driven by
+  -- somebody the group does not list as a driver" - and the same two answers, flip the
+  -- switch or leave it.
+  --
+  -- driver_id is null on a car driven by a name rather than an account (023), and a name
+  -- has no membership to check. Without this the whole feature reads as a warning.
   select 'WARNING: car driver no longer drives in that group', c.title
     from cars c
     join trips t on t.id = c.trip_id
-   where not exists (
-     select 1 from group_members m
-      where m.group_id = t.group_id
-        and m.profile_id = c.driver_id
-        and m.travel_role = 'driver'
-   )
+   where c.driver_id is not null
+     and not exists (
+       select 1 from group_members m
+        where m.group_id = t.group_id
+          and m.profile_id = c.driver_id
+          and m.travel_role = 'driver'
+     )
+
+  union all
+
+  -- 023 lets a trip manager name someone else as the driver, which is the first way a car
+  -- can point at a profile outside the trip's group. guard_car_driver() refuses it; this
+  -- says so independently.
+  select 'car driver is not in the trip group', c.title
+    from cars c
+    join trips t on t.id = c.trip_id
+   where c.driver_id is not null
+     and not exists (
+       select 1 from group_members m
+        where m.group_id = t.group_id and m.profile_id = c.driver_id
+     )
 
   union all
 
