@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import ThemeToggle from './ThemeToggle'
 
 export default function NavBar() {
   const { profile, session, signOut } = useAuth()
@@ -17,6 +18,7 @@ export default function NavBar() {
       <Link to="/groups">Groups</Link>
       {profile?.role === 'admin' && <Link to="/admin">People</Link>}
       <Link to="/me">{profile?.displayName ?? session?.user.email ?? 'Me'}</Link>
+      <ThemeToggle />
       <button type="button" onClick={handleSignOut}>
         Sign out
       </button>

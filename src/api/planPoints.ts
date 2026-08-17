@@ -96,6 +96,24 @@ export async function reorderPlanPoints(ids: string[]): Promise<void> {
   }
 }
 
+/**
+ * A stop dragged into another day: the day and the destination's order in one transaction,
+ * so a drag either lands or does not. `ids` is the destination day in its new order, the
+ * moved stop included.
+ */
+export async function movePlanPoint(id: string, toDay: number, ids: string[]): Promise<void> {
+  const { data, error } = await supabase.rpc('move_plan_point', {
+    point: id,
+    to_day: toDay,
+    ordered: ids,
+  })
+
+  if (error) throw error
+  if (data !== ids.length) {
+    throw new Error('The stop was not moved - only somebody who runs this trip can change the plan.')
+  }
+}
+
 export async function updatePlanPoint(
   id: string,
   patch: PlanPointInput,

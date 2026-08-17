@@ -23,6 +23,16 @@ import { managesTrip } from '../lib/authority'
 import { errorMessage } from '../lib/errors'
 import { DateRange } from './Trips'
 
+type TabKey = 'cars' | 'plan' | 'people' | 'settings'
+
+/** Settings is filtered out below for anyone who can neither manage nor publish the trip. */
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'cars', label: 'Cars & seats' },
+  { key: 'plan', label: 'Plan' },
+  { key: 'people', label: 'People' },
+  { key: 'settings', label: 'Settings' },
+]
+
 export default function TripDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -37,6 +47,9 @@ export default function TripDetail() {
   const [copied, setCopied] = useState(false)
   /** A read that failed, as opposed to a trip that is not there. Kept apart on purpose. */
   const [loadFailure, setLoadFailure] = useState<string | null>(null)
+  // Cars first: checking or booking a seat is what people come back to a trip for, where
+  // the plan is read once. Not in the URL - a tab is a view, not somewhere to link to.
+  const [tab, setTab] = useState<TabKey>('cars')
 
   const [name, setName] = useState('')
   const [startsOn, setStartsOn] = useState('')
@@ -144,6 +157,19 @@ export default function TripDetail() {
 
   const hostName = (hostId: string) =>
     participants.find((p) => p.profileId === hostId)?.displayName ?? 'someone'
+
+  const seatsTotal = cars.reduce((n, c) => n + c.seatCount, 0)
+  const seatsTaken = bookings.filter((b) => b.status === 'confirmed').length
+  // Only about me, and only when there is something to say: the header is not the place to
+  // list every seat I booked for somebody else. carTitle is hoisted, declared below.
+  const mySeat = myBookings.find((b) => b.profileId === currentUserId)
+  const mySeatSummary = !mySeat
+    ? null
+    : mySeat.status === 'confirmed'
+      ? `you are in ${carTitle(mySeat.carId) ?? 'a car'}`
+      : mySeat.status === 'denied'
+        ? 'your seat was declined'
+        : 'you are waiting for a car'
 
   function carTitle(carId: string | null): string | null {
     if (!carId) return null
@@ -274,191 +300,238 @@ export default function TripDetail() {
 
       {trip.description && <p>{trip.description}</p>}
 
-      <TripPlan tripId={trip.id} startsOn={trip.startsOn} canManage={canManage} />
+      {/* The three things everyone opens a trip for, above the tabs so none of them is
+          behind a click: who is coming, whether there is room, and where I stand. */}
+      <p className="muted">
+        {participants.length} {participants.length === 1 ? 'person' : 'people'} going ·{' '}
+        {seatsTaken} of {seatsTotal} {seatsTotal === 1 ? 'seat' : 'seats'} taken
+        {mySeatSummary && <> · {mySeatSummary}</>}
+      </p>
 
-      {/* `trips.plan` is free text and predates the itinerary above. It reads as the notes
-          the stops have no column for, so it keeps its content and loses its old name. */}
-      {trip.plan && (
+      <div className="tabs" role="tablist" aria-label="This trip">
+        {TABS.filter((t) => t.key !== 'settings' || canManage || canPublish).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            className={tab === t.key ? 'tab is-active' : 'tab'}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            {t.key === 'cars' && ` (${cars.length})`}
+            {t.key === 'people' && ` (${participants.length})`}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'plan' && (
         <>
-          <h2>Notes</h2>
-          <p className="prewrap">{trip.plan}</p>
+          <TripPlan tripId={trip.id} startsOn={trip.startsOn} canManage={canManage} />
+
+          {/* `trips.plan` is free text and predates the itinerary above. It reads as the
+              notes the stops have no column for, so it kept its content and lost its
+              old name. */}
+          {trip.plan && (
+            <>
+              <h2>Notes</h2>
+              <p className="prewrap">{trip.plan}</p>
+            </>
+          )}
         </>
       )}
 
-      <h2>Going ({participants.length})</h2>
+      {tab === 'people' && (
+        <>
+          <h2>Going ({participants.length})</h2>
 
-      <ParticipantList
-        participants={participants}
-        creatorId={trip.createdBy}
-        currentUserId={currentUserId}
-        canRemove={canManage}
-        onRemove={(profileId) => withBusy(() => removeParticipant(trip.id, profileId))}
-      />
+          <ParticipantList
+            participants={participants}
+            creatorId={trip.createdBy}
+            currentUserId={currentUserId}
+            canRemove={canManage}
+            onRemove={(profileId) => withBusy(() => removeParticipant(trip.id, profileId))}
+          />
 
-      <button
-        type="button"
-        onClick={toggleParticipation}
-        disabled={peopleBusy || (isParticipant && iHoldSeat)}
-      >
-        {isParticipant ? 'Leave trip' : 'Join trip'}
-      </button>
+          <button
+            type="button"
+            onClick={toggleParticipation}
+            disabled={peopleBusy || (isParticipant && iHoldSeat)}
+          >
+            {isParticipant ? 'Leave trip' : 'Join trip'}
+          </button>
 
-      {isParticipant && iHoldSeat && (
-        <p className="muted">Cancel your seat below before leaving the trip.</p>
+          {isParticipant && iHoldSeat && (
+            <p className="muted">
+              Give up your seat under “Cars &amp; seats” before leaving the trip.
+            </p>
+          )}
+        </>
       )}
 
-      <h2>Cars ({cars.length})</h2>
+      {tab === 'cars' && (
+        <>
+          <h2>Cars ({cars.length})</h2>
 
-      {cars.length === 0 ? (
-        <p className="muted">No cars registered yet.</p>
-      ) : (
-        <ul className="cards">
-          {cars.map((car) => (
-            <CarCard key={car.id} car={car} seatsTaken={seatsIn(car.id).length}>
-              <SeatGrid
-                car={car}
-                seats={seatsIn(car.id)}
-                hostName={hostName}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-              />
-            </CarCard>
-          ))}
-        </ul>
-      )}
+          {cars.length === 0 ? (
+            <p className="muted">No cars registered yet.</p>
+          ) : (
+            <ul className="cards">
+              {cars.map((car) => (
+                <CarCard key={car.id} car={car} seatsTaken={seatsIn(car.id).length}>
+                  <SeatGrid
+                    car={car}
+                    seats={seatsIn(car.id)}
+                    hostName={hostName}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
+                  />
+                </CarCard>
+              ))}
+            </ul>
+          )}
 
-      {canRegisterCar && (
-        <Link className="action" to={`/trips/${trip.id}/cars/new`}>
-          Register my car
-        </Link>
-      )}
+          {canRegisterCar && (
+            <Link className="action" to={`/trips/${trip.id}/cars/new`}>
+              Register my car
+            </Link>
+          )}
 
-      <h2>Not in a car yet ({unseated.length})</h2>
+          <h2>Not in a car yet ({unseated.length})</h2>
 
-      {unseated.length === 0 ? (
-        <p className="muted">Everyone with a seat has a car.</p>
-      ) : (
-        <ul className="people">
-          {unseated.map((b) => (
-            <li key={b.id} className="person">
-              <span>
-                {b.occupantName}
-                {b.isGuest && b.guestHostId && (
-                  <span className="muted"> (+1 of {hostName(b.guestHostId)})</span>
-                )}
-                <span className="badge">
-                  {carTitle(b.preferredCarId)
-                    ? `asked for ${carTitle(b.preferredCarId)}`
-                    : 'no preference'}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+          {unseated.length === 0 ? (
+            <p className="muted">Everyone with a seat has a car.</p>
+          ) : (
+            <ul className="people">
+              {unseated.map((b) => (
+                <li key={b.id} className="person">
+                  <span>
+                    {b.occupantName}
+                    {b.isGuest && b.guestHostId && (
+                      <span className="muted"> (+1 of {hostName(b.guestHostId)})</span>
+                    )}
+                    <span className="badge">
+                      {carTitle(b.preferredCarId)
+                        ? `asked for ${carTitle(b.preferredCarId)}`
+                        : 'no preference'}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
 
-      <h2>My seats</h2>
+          <h2>My seats</h2>
 
-      {myBookings.length === 0 ? (
-        <p className="muted">You have not booked a seat yet.</p>
-      ) : (
-        <ul className="people">
-          {myBookings.map((b) => (
-            <li key={b.id} className="person">
-              <span>
-                {b.occupantName}
-                {b.isGuest && <span className="muted"> (+1)</span>}
-                <span className="badge">{seatStatus(b)}</span>
-                {b.comment && <span className="muted"> — {b.comment}</span>}
-              </span>
-              <span className="spacer" />
+          {myBookings.length === 0 ? (
+            <p className="muted">You have not booked a seat yet.</p>
+          ) : (
+            <ul className="people">
+              {myBookings.map((b) => (
+                <li key={b.id} className="person">
+                  <span>
+                    {b.occupantName}
+                    {b.isGuest && <span className="muted"> (+1)</span>}
+                    <span className="badge">{seatStatus(b)}</span>
+                    {b.comment && <span className="muted"> — {b.comment}</span>}
+                  </span>
+                  <span className="spacer" />
 
-              {cars.length > 0 && (
-                <select
-                  aria-label={`Preferred car for ${b.occupantName}`}
-                  value={b.preferredCarId ?? ''}
-                  disabled={peopleBusy}
-                  onChange={(e) => withBusy(() => setPreferredCar(b.id, e.target.value || null))}
-                >
-                  <option value="">No preference</option>
-                  {cars.map((car) => (
-                    <option key={car.id} value={car.id}>
-                      {car.title}
-                    </option>
-                  ))}
-                </select>
-              )}
+                  {cars.length > 0 && (
+                    <select
+                      aria-label={`Preferred car for ${b.occupantName}`}
+                      value={b.preferredCarId ?? ''}
+                      disabled={peopleBusy}
+                      onChange={(e) => withBusy(() => setPreferredCar(b.id, e.target.value || null))}
+                    >
+                      <option value="">No preference</option>
+                      {cars.map((car) => (
+                        <option key={car.id} value={car.id}>
+                          {car.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
-              <button
-                type="button"
-                className="link"
-                onClick={() => {
-                  if (window.confirm('Give up this seat?')) void withBusy(() => cancelBooking(b.id))
-                }}
-                disabled={peopleBusy}
-              >
-                Cancel
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() => {
+                      if (window.confirm('Give up this seat?')) void withBusy(() => cancelBooking(b.id))
+                    }}
+                    disabled={peopleBusy}
+                  >
+                    Cancel
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
 
-      {currentUserId && (
-        <BookingForm
-          tripId={trip.id}
-          currentUserId={currentUserId}
-          bookings={bookings}
-          cars={cars}
-          onBooked={loadBoard}
-        />
-      )}
-
-      {canPublish && (
-        <section>
-          <h2>Share outside the group</h2>
-
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={trip.isPublic}
-              disabled={peopleBusy}
-              onChange={(e) => withBusy(() => setTripVisibility(trip.id, e.target.checked))}
+          {currentUserId && (
+            <BookingForm
+              tripId={trip.id}
+              currentUserId={currentUserId}
+              bookings={bookings}
+              cars={cars}
+              onBooked={loadBoard}
             />
-            Anyone with the link can see this trip
-          </label>
+          )}
+        </>
+      )}
 
-          <p className="muted">
-            They see the trip, its cars and how many seats are taken — never who is going,
-            who drives, or anything written in a seat comment.
-          </p>
+      {tab === 'settings' && (
+        <>
+          {canPublish && (
+            <section>
+              <h2>Share outside the group</h2>
 
-          {trip.isPublic && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={trip.isPublic}
+                  disabled={peopleBusy}
+                  onChange={(e) => withBusy(() => setTripVisibility(trip.id, e.target.checked))}
+                />
+                Anyone with the link can see this trip
+              </label>
+
+              <p className="muted">
+                They see the trip, its cars and how many seats are taken — never who is going,
+                who drives, or anything written in a seat comment.
+              </p>
+
+              {trip.isPublic && (
+                <>
+                  <p className="invite-link">{publicUrl}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(publicUrl)
+                      setCopied(true)
+                    }}
+                  >
+                    {copied ? 'Copied' : 'Copy link'}
+                  </button>
+                </>
+              )}
+            </section>
+          )}
+
+          {canManage && (
             <>
-              <p className="invite-link">{publicUrl}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(publicUrl)
-                  setCopied(true)
-                }}
-              >
-                {copied ? 'Copied' : 'Copy link'}
-              </button>
+              <h2>This trip</h2>
+              <div className="row">
+                <button type="button" onClick={() => setEditing(true)}>
+                  Edit name, dates and notes
+                </button>
+                <button type="button" className="danger" onClick={remove} disabled={busy}>
+                  Delete trip
+                </button>
+              </div>
             </>
           )}
-        </section>
-      )}
-
-      {canManage && (
-        <div className="row">
-          <button type="button" onClick={() => setEditing(true)}>
-            Edit
-          </button>
-          <button type="button" onClick={remove} disabled={busy}>
-            Delete
-          </button>
-        </div>
+        </>
       )}
 
       {/* Still showing the last successful load - say it may be stale rather than claiming

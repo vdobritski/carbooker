@@ -4,6 +4,7 @@ import {
   createPlanPoint,
   deletePlanPoint,
   listPlanPoints,
+  movePlanPoint,
   reorderPlanPoints,
   updatePlanPoint,
 } from '../api/planPoints'
@@ -129,44 +130,60 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
   }
 
   /**
-   * Put one day back in a new order. The list on screen moves first and the write follows,
-   * because a drag that visibly hesitates feels broken - and `load()` at the end is what
-   * puts it back if the write was refused.
+   * One stop put somewhere else: a new position in its own day, or another day entirely.
+   * `ordered` is the destination day in full, the moved stop included.
+   *
+   * The list on screen moves first and the write follows, because a drag that visibly
+   * hesitates feels broken - and `load()` at the end is what puts it back if the write was
+   * refused.
    */
-  async function applyOrder(day: number, ordered: TripPlanPoint[]) {
-    const others = (points ?? []).filter((p) => p.day !== day)
+  async function applyMove(moved: TripPlanPoint, toDay: number, ordered: TripPlanPoint[]) {
+    const others = (points ?? []).filter((p) => p.day !== toDay && p.id !== moved.id)
     setPoints([...others, ...ordered].sort((a, b) => a.day - b.day))
     setError(null)
     try {
-      await reorderPlanPoints(ordered.map((p) => p.id))
+      const ids = ordered.map((p) => p.id)
+      if (moved.day === toDay) await reorderPlanPoints(ids)
+      else await movePlanPoint(moved.id, toDay, ids)
     } catch (err: unknown) {
       setError(errorMessage(err))
     }
     await load()
   }
 
-  /** Same day, moved from one index to another. Returns null when nothing would change. */
-  function reordered(day: number, from: number, to: number): TripPlanPoint[] | null {
-    const stops = (points ?? []).filter((p) => p.day === day)
-    if (from === to || from < 0 || to < 0 || to >= stops.length) return null
-    const next = [...stops]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
-    return next
-  }
-
-  function move(day: number, from: number, to: number) {
-    const next = reordered(day, from, to)
-    if (next) void applyOrder(day, next)
-  }
-
-  /** A drop onto another stop. Dragging between days is not a thing - the Day field is. */
-  function dropOnto(day: number, index: number) {
-    const stops = (points ?? []).filter((p) => p.day === day)
-    const from = stops.findIndex((p) => p.id === dragId)
+  /**
+   * Where a drop lands. `before` is the stop it was dropped on, or null for the end of the
+   * day - which is what a drop on the day's heading means, and the only way to reach an
+   * empty spot at the bottom of another day.
+   *
+   * Positions are worked out against the destination *without* the dragged stop in it, so
+   * dragging something downwards inside its own day does not land one place short.
+   */
+  function dropInto(toDay: number, before: TripPlanPoint | null) {
+    const all = points ?? []
+    const moved = all.find((p) => p.id === dragId)
     setDragId(null)
-    if (from === -1) return
-    move(day, from, index)
+    if (!moved || moved.id === before?.id) return
+
+    const rest = all.filter((p) => p.day === toDay && p.id !== moved.id)
+    const at = before ? rest.findIndex((p) => p.id === before.id) : rest.length
+    const ordered = [...rest]
+    ordered.splice(at < 0 ? rest.length : at, 0, { ...moved, day: toDay })
+
+    void applyMove(moved, toDay, ordered)
+  }
+
+  /** The arrow buttons, which are the same move with the neighbour as the target. */
+  function nudge(day: number, index: number, delta: number) {
+    const stops = (points ?? []).filter((p) => p.day === day)
+    const moved = stops[index]
+    const to = index + delta
+    if (!moved || to < 0 || to > stops.length - 1) return
+
+    const rest = stops.filter((p) => p.id !== moved.id)
+    const ordered = [...rest]
+    ordered.splice(to, 0, moved)
+    void applyMove(moved, day, ordered)
   }
 
   async function remove(point: TripPlanPoint) {
@@ -208,7 +225,20 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
       ) : (
         days.map(({ day: n, points: stops }) => (
           <section key={n}>
-            <h3>{planDayLabel(n, startsOn)}</h3>
+            {/* Dropping on the heading sends the stop to the end of that day - the only way
+                to reach the empty space below another day's last stop. */}
+            <h3
+              className={canManage && dragId ? 'droppable' : undefined}
+              onDragOver={(e) => {
+                if (dragId) e.preventDefault()
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                dropInto(n, null)
+              }}
+            >
+              {planDayLabel(n, startsOn)}
+            </h3>
             <ul className="people">
               {stops.map((point, index) => (
                 <li
@@ -225,7 +255,7 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
                   }}
                   onDrop={(e) => {
                     e.preventDefault()
-                    dropOnto(n, index)
+                    dropInto(n, point)
                   }}
                 >
                   {canManage && (
@@ -256,7 +286,7 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
                         className="link"
                         aria-label={`Move ${point.title} earlier`}
                         disabled={busy || index === 0}
-                        onClick={() => move(n, index, index - 1)}
+                        onClick={() => nudge(n, index, -1)}
                       >
                         ↑
                       </button>
@@ -265,7 +295,7 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
                         className="link"
                         aria-label={`Move ${point.title} later`}
                         disabled={busy || index === stops.length - 1}
-                        onClick={() => move(n, index, index + 1)}
+                        onClick={() => nudge(n, index, 1)}
                       >
                         ↓
                       </button>
@@ -295,7 +325,10 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
       )}
 
       {canManage && (points ?? []).length > 1 && (
-        <p className="muted">Drag a stop, or use ↑ ↓, to change the order within a day.</p>
+        <p className="muted">
+          Drag a stop to reorder it, or onto another day's heading to move it there. ↑ ↓
+          work within a day, and the Day field moves a stop anywhere.
+        </p>
       )}
 
       {canManage &&

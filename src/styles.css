@@ -63,35 +63,40 @@
   --ring: 0 0 0 3px var(--accent-soft);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #101317;
-    --surface: #181c22;
-    --surface-2: #20252c;
-    --border: #2b313a;
-    --border-strong: #3d4550;
-    --ink: #e8ecf1;
-    --ink-2: #a3adba;
-    /* Measured, not eyeballed: at #77818e the dashed "free seat" placeholder came out at
-       4.33:1 on --surface, just under AA. */
-    --ink-3: #8d97a4;
+/* Dark, and only ever reached through data-theme - src/lib/theme.ts resolves "follow the
+   system" to one of these two and stamps the attribute. That is what keeps this block from
+   having to exist twice, once here and once inside a prefers-color-scheme query.
 
-    --accent: #6c9bff;
-    --accent-ink: #0d1117;
-    --accent-soft: #1b2740;
-    --accent-border: #2f4a7a;
+   Lightened in the UI pass: the first version sat at #101317/#181c22, which read as a hole
+   rather than a surface. These are a few steps up, so panels separate from the page without
+   the page itself going black. */
+:root[data-theme='dark'] {
+  --bg: #171b21;
+  --surface: #1f242c;
+  --surface-2: #272d36;
+  --border: #333b46;
+  --border-strong: #4a545f;
+  --ink: #eef1f5;
+  --ink-2: #adb7c4;
+  /* Measured, not eyeballed: at #77818e the dashed "free seat" placeholder came out at
+     4.33:1 on --surface, just under AA. */
+  --ink-3: #939dab;
 
-    --ok: #4ecfa6;
-    --ok-soft: #14302a;
-    --warn-ink: #e8b563;
-    --warn-soft: #322616;
-    --danger: #ff7b6b;
-    --danger-soft: #331e1c;
+  --accent: #7aa5ff;
+  --accent-ink: #0d1117;
+  --accent-soft: #223052;
+  --accent-border: #3a568c;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
-    --ring: 0 0 0 3px rgba(108, 155, 255, 0.25);
-  }
+  --ok: #4ecfa6;
+  --ok-soft: #173a32;
+  --warn-ink: #edbd6f;
+  --warn-soft: #3a2d1a;
+  --danger: #ff8878;
+  --danger-soft: #3d2422;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --ring: 0 0 0 3px rgba(122, 165, 255, 0.28);
 }
 
 /* ---------- base ---------- */
@@ -562,6 +567,14 @@ form .muted {
 
 .person.dragging {
   opacity: 0.45;
+}
+
+/* A day heading while something is being dragged: it accepts a drop at the end of that day,
+   and there is otherwise nothing on screen to say so. */
+h3.droppable {
+  outline: 2px dashed var(--accent);
+  outline-offset: var(--s-1);
+  border-radius: var(--r-1);
 }
 
 .person .grip {
