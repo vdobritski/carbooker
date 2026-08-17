@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
 import type { TripPlanPoint, TripPlanPointRow } from '../lib/types'
 
-const COLUMNS = 'id, trip_id, day, at_time, title, url, created_at'
+const COLUMNS = 'id, trip_id, day, at_time, title, url, sort_order, created_at'
 
 /**
  * Postgres returns a `time` as 'HH:MM:SS'; an <input type="time"> wants 'HH:MM' and shows
@@ -20,6 +20,7 @@ function toPoint(row: TripPlanPointRow): TripPlanPoint {
     atTime: shortTime(row.at_time),
     title: row.title,
     url: row.url,
+    sortOrder: row.sort_order,
     createdAt: row.created_at,
   }
 }
@@ -42,9 +43,8 @@ function columns(input: PlanPointInput) {
 }
 
 /**
- * The whole itinerary in one query, in reading order. `nullsFirst: false` puts a stop with
- * no time at the end of its day, where it reads as "not placed yet" rather than as the
- * first thing that morning.
+ * The whole itinerary in one query, in the order somebody put it in. created_at only breaks
+ * ties between two stops that were never dragged apart.
  */
 export async function listPlanPoints(tripId: string): Promise<TripPlanPoint[]> {
   const { data, error } = await supabase
@@ -52,25 +52,48 @@ export async function listPlanPoints(tripId: string): Promise<TripPlanPoint[]> {
     .select(COLUMNS)
     .eq('trip_id', tripId)
     .order('day', { ascending: true })
-    .order('at_time', { ascending: true, nullsFirst: false })
+    .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (error) throw error
   return (data as TripPlanPointRow[]).map(toPoint)
 }
 
+/**
+ * Added at the end of its day. `after` is the stops already on that day, so the caller does
+ * not need a second query to work out where the end is - and typing an itinerary in order
+ * still comes out in order, without a drag.
+ */
 export async function createPlanPoint(
   tripId: string,
   input: PlanPointInput,
+  sameDay: TripPlanPoint[],
 ): Promise<TripPlanPoint> {
+  const last = sameDay.reduce((n, p) => Math.max(n, p.sortOrder), 0)
+
   const { data, error } = await supabase
     .from('trip_plan_points')
-    .insert({ trip_id: tripId, ...columns(input) })
+    .insert({ trip_id: tripId, ...columns(input), sort_order: last + 1 })
     .select(COLUMNS)
     .single()
 
   if (error) throw error
   return toPoint(data as TripPlanPointRow)
+}
+
+/**
+ * Writes a whole day's order in one request. The database returns how many rows it moved,
+ * because RLS filters rows rather than raising - without the count, a passenger dragging a
+ * stop would see it snap back with no explanation instead of an error.
+ */
+export async function reorderPlanPoints(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+
+  const { data, error } = await supabase.rpc('reorder_plan_points', { ids })
+  if (error) throw error
+  if (data !== ids.length) {
+    throw new Error('The new order was not saved - only somebody who runs this trip can reorder stops.')
+  }
 }
 
 export async function updatePlanPoint(

@@ -74,6 +74,8 @@ export interface TripPlanPointRow {
   at_time: string | null
   title: string
   url: string | null
+  /** 025. Explicit order within a day; ties broken by created_at. */
+  sort_order: number
   created_at: string
 }
 
@@ -87,6 +89,8 @@ export interface TripPlanPoint {
   title: string
   /** Checked to start with http:// or https:// by the database - it becomes an href. */
   url: string | null
+  /** Where it sits in its day. Set by dragging, never by the time on the stop. */
+  sortOrder: number
   createdAt: string
 }
 

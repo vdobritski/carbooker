@@ -550,6 +550,27 @@ form .muted {
   flex: 1;
 }
 
+/* A draggable stop on the trip plan. The grip is the affordance; the whole row is the
+   drag target, because a 12px handle is a miserable thing to aim at. */
+.person.movable {
+  cursor: grab;
+}
+
+.person.movable:active {
+  cursor: grabbing;
+}
+
+.person.dragging {
+  opacity: 0.45;
+}
+
+.person .grip {
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+  line-height: 1;
+}
+
 .person select {
   width: auto;
   min-width: 8rem;

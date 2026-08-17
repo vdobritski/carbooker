@@ -251,12 +251,22 @@ Primary key `(trip_id, profile_id)`.
 | `at_time` | time | null while the time is not fixed |
 | `title` | text not null | "Arrive in Hrodna" |
 | `url` | text | `check` it starts `http://` or `https://` — it is rendered as an href |
-| `created_at` | timestamptz | breaks ties between two stops at the same time |
+| `sort_order` | int not null default 0 | **025** — position within its day |
+| `created_at` | timestamptz | breaks ties between two stops never dragged apart |
 
-There is **no sort column**. Stops read in `day, at_time nulls last, created_at` order, which
-is the order somebody writing an itinerary already has in their head; a stop with no time
-sits at the end of its day, where it reads as "not placed yet". Reordering is done by
-changing a time, not by dragging.
+Stops read in `day, sort_order, created_at` order. **024** had no sort column and sorted by
+time; **025** replaced that with an explicit order, because dragging was what was wanted and
+it needs somewhere to put the answer. Consequences, both deliberate:
+
+- a new stop lands at the **end of its day** rather than slotting in by time. Typing an
+  itinerary in order still comes out in order;
+- **editing a time moves nothing.** Once the order is somebody's own, an edit that re-sorted
+  the day would silently undo a drag.
+
+`reorder_plan_points(uuid[])` writes a whole day in one request. It is **security invoker**,
+so the `manages_trip` update policy is still what decides, and it returns the row count —
+RLS filters rows rather than raising, so without the count a passenger dragging a stop would
+get a silent no-op instead of an error.
 
 `day` is a number rather than a date so a trip can be planned before its dates are set. The
 screen adds the real date beside "Day 2" whenever `trips.starts_on` is known.

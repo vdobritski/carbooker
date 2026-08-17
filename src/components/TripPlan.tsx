@@ -4,6 +4,7 @@ import {
   createPlanPoint,
   deletePlanPoint,
   listPlanPoints,
+  reorderPlanPoints,
   updatePlanPoint,
 } from '../api/planPoints'
 import { errorMessage } from '../lib/errors'
@@ -58,6 +59,8 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
 
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  /** The stop being dragged. Null the rest of the time, including on touch. */
+  const [dragId, setDragId] = useState<string | null>(null)
   const [day, setDay] = useState('1')
   const [atTime, setAtTime] = useState('')
   const [title, setTitle] = useState('')
@@ -115,7 +118,7 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
         url: url.trim() || null,
       }
       if (editingId) await updatePlanPoint(editingId, input)
-      else await createPlanPoint(tripId, input)
+      else await createPlanPoint(tripId, input, (points ?? []).filter((p) => p.day === input.day))
       closeForm()
       await load()
     } catch (err: unknown) {
@@ -123,6 +126,47 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * Put one day back in a new order. The list on screen moves first and the write follows,
+   * because a drag that visibly hesitates feels broken - and `load()` at the end is what
+   * puts it back if the write was refused.
+   */
+  async function applyOrder(day: number, ordered: TripPlanPoint[]) {
+    const others = (points ?? []).filter((p) => p.day !== day)
+    setPoints([...others, ...ordered].sort((a, b) => a.day - b.day))
+    setError(null)
+    try {
+      await reorderPlanPoints(ordered.map((p) => p.id))
+    } catch (err: unknown) {
+      setError(errorMessage(err))
+    }
+    await load()
+  }
+
+  /** Same day, moved from one index to another. Returns null when nothing would change. */
+  function reordered(day: number, from: number, to: number): TripPlanPoint[] | null {
+    const stops = (points ?? []).filter((p) => p.day === day)
+    if (from === to || from < 0 || to < 0 || to >= stops.length) return null
+    const next = [...stops]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    return next
+  }
+
+  function move(day: number, from: number, to: number) {
+    const next = reordered(day, from, to)
+    if (next) void applyOrder(day, next)
+  }
+
+  /** A drop onto another stop. Dragging between days is not a thing - the Day field is. */
+  function dropOnto(day: number, index: number) {
+    const stops = (points ?? []).filter((p) => p.day === day)
+    const from = stops.findIndex((p) => p.id === dragId)
+    setDragId(null)
+    if (from === -1) return
+    move(day, from, index)
   }
 
   async function remove(point: TripPlanPoint) {
@@ -166,8 +210,29 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
           <section key={n}>
             <h3>{planDayLabel(n, startsOn)}</h3>
             <ul className="people">
-              {stops.map((point) => (
-                <li key={point.id} className="person">
+              {stops.map((point, index) => (
+                <li
+                  key={point.id}
+                  className={`person${canManage ? ' movable' : ''}${
+                    dragId === point.id ? ' dragging' : ''
+                  }`}
+                  draggable={canManage && !busy}
+                  onDragStart={() => setDragId(point.id)}
+                  onDragEnd={() => setDragId(null)}
+                  // Without preventDefault the browser refuses the drop outright.
+                  onDragOver={(e) => {
+                    if (dragId) e.preventDefault()
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    dropOnto(n, index)
+                  }}
+                >
+                  {canManage && (
+                    <span className="grip" aria-hidden="true">
+                      ⠿
+                    </span>
+                  )}
                   <span>
                     <Time atTime={point.atTime} /> — {point.title}
                     {point.url && (
@@ -184,6 +249,26 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
                   <span className="spacer" />
                   {canManage && (
                     <>
+                      {/* Dragging is a mouse gesture: HTML5 drag and drop does nothing on a
+                          phone, and nothing from a keyboard. These two do both. */}
+                      <button
+                        type="button"
+                        className="link"
+                        aria-label={`Move ${point.title} earlier`}
+                        disabled={busy || index === 0}
+                        onClick={() => move(n, index, index - 1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="link"
+                        aria-label={`Move ${point.title} later`}
+                        disabled={busy || index === stops.length - 1}
+                        onClick={() => move(n, index, index + 1)}
+                      >
+                        ↓
+                      </button>
                       <button
                         type="button"
                         className="link"
@@ -207,6 +292,10 @@ export default function TripPlan({ tripId, startsOn, canManage }: Props) {
             </ul>
           </section>
         ))
+      )}
+
+      {canManage && (points ?? []).length > 1 && (
+        <p className="muted">Drag a stop, or use ↑ ↓, to change the order within a day.</p>
       )}
 
       {canManage &&
