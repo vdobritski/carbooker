@@ -94,6 +94,19 @@ export async function createInvite(groupId: string): Promise<GroupInvite> {
   return toInvite(data as GroupInviteRow)
 }
 
+/**
+ * Revoking is idempotent, and that is the whole point of the second read.
+ *
+ * A delete of zero rows means one of two things and the difference matters: the policy
+ * refused it, or the link was already gone - two managers on the same group both clicking
+ * Revoke, which used to tell the slower one they were not allowed to. They were; there was
+ * simply nothing left to delete. The end state they asked for is the one they got.
+ *
+ * getInvite() is what tells the two apart: a row still sitting there after the delete is a
+ * refusal. (A plain member reads null for the same policy reason they cannot delete, so
+ * they would be told it worked - they have no Revoke button and never see the token, so
+ * that path is not reachable from the app.)
+ */
 export async function revokeInvite(groupId: string): Promise<void> {
   const { data, error } = await supabase
     .from('group_invites')
@@ -102,7 +115,9 @@ export async function revokeInvite(groupId: string): Promise<void> {
     .select('group_id')
 
   if (error) throw error
-  if (!data || data.length === 0) {
+  if (data && data.length > 0) return
+
+  if (await getInvite(groupId)) {
     throw new Error('The link was not revoked - only the owner or someone who manages people can.')
   }
 }
@@ -265,6 +280,38 @@ export async function acceptRequest(groupId: string, profileId: string): Promise
     .eq('profile_id', profileId)
 
   if (deleteError) throw deleteError
+}
+
+/**
+ * Clear a request out of the queue for good. Declining leaves the row in place on purpose,
+ * so the person can see they were turned down - but that left a queue nothing could ever
+ * empty. This is the way out: the row goes, and with nothing recording the refusal they may
+ * ask again.
+ *
+ * Same idempotence as revokeInvite(), for the same reason - two managers, one queue.
+ */
+export async function dismissRequest(groupId: string, profileId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('group_join_requests')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('profile_id', profileId)
+    .select('profile_id')
+
+  if (error) throw error
+  if (data && data.length > 0) return
+
+  const { data: still, error: readError } = await supabase
+    .from('group_join_requests')
+    .select('profile_id')
+    .eq('group_id', groupId)
+    .eq('profile_id', profileId)
+    .maybeSingle()
+
+  if (readError) throw readError
+  if (still) {
+    throw new Error('That request was not cleared - only the owner or someone who manages people can.')
+  }
 }
 
 /** The row stays, with the answer on it, so the person can see they were turned down. */

@@ -16,6 +16,7 @@ import type { PermissionPatch } from '../api/groups'
 import {
   acceptRequest,
   createInvite,
+  dismissRequest,
   getInvite,
   listJoinRequests,
   myRequest,
@@ -492,6 +493,13 @@ export default function GroupDetail() {
 
           <h2>Requests to join ({pendingCount})</h2>
 
+          {queue.some((r) => r.status === 'rejected') && (
+            <p className="muted">
+              A declined request stays here so the person can see the answer. Clear it and
+              they may ask again.
+            </p>
+          )}
+
           {queue.length === 0 ? (
             <p className="muted">Nobody is waiting.</p>
           ) : (
@@ -512,7 +520,7 @@ export default function GroupDetail() {
 
                     <span className="spacer" />
 
-                    {request.status === 'pending' && (
+                    {request.status === 'pending' ? (
                       <>
                         <button
                           type="button"
@@ -532,6 +540,29 @@ export default function GroupDetail() {
                           }
                         >
                           Decline
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {/* Letting them in after all, without making them ask again. */}
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            withBusy(() => acceptRequest(group.id, request.profileId))
+                          }
+                        >
+                          Accept after all
+                        </button>
+                        <button
+                          type="button"
+                          className="link"
+                          disabled={busy}
+                          onClick={() =>
+                            withBusy(() => dismissRequest(group.id, request.profileId))
+                          }
+                        >
+                          Clear
                         </button>
                       </>
                     )}
