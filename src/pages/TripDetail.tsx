@@ -7,6 +7,7 @@ import {
   joinTrip,
   leaveTrip,
   removeParticipant,
+  setTripVisibility,
   updateTrip,
 } from '../api/trips'
 import type { TripBoard } from '../api/trips'
@@ -31,6 +32,7 @@ export default function TripDetail() {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [peopleBusy, setPeopleBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const [name, setName] = useState('')
   const [startsOn, setStartsOn] = useState('')
@@ -97,6 +99,11 @@ export default function TripDetail() {
   const canManageInGroup =
     myGroupRights?.canManageTrips === true || myGroupRights?.isOwner === true || isAdmin
   const canManage = trip.createdBy === currentUserId || canManageInGroup
+  // Publishing exposes the group to the open internet, so it is the owner's call rather
+  // than any trip manager's - trips_visibility_guard enforces the same rule.
+  const canPublish = myGroupRights?.isOwner === true || isAdmin
+  // Same shape as the invite link: window.location.pathname is the Vite base.
+  const publicUrl = `${window.location.origin}${window.location.pathname}#/t/${trip.id}`
   // Driving is a property of my membership of this trip's group, not of my site role -
   // the cars_insert policy asks can_drive_in_group(), which folds in site admins.
   const canRegisterCar = myGroupRights?.travelRole === 'driver' || isAdmin
@@ -374,6 +381,42 @@ export default function TripDetail() {
           cars={cars}
           onBooked={loadBoard}
         />
+      )}
+
+      {canPublish && (
+        <section>
+          <h2>Share outside the group</h2>
+
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={trip.isPublic}
+              disabled={peopleBusy}
+              onChange={(e) => withBusy(() => setTripVisibility(trip.id, e.target.checked))}
+            />
+            Anyone with the link can see this trip
+          </label>
+
+          <p className="muted">
+            They see the trip, its cars and how many seats are taken — never who is going,
+            who drives, or anything written in a seat comment.
+          </p>
+
+          {trip.isPublic && (
+            <>
+              <p className="invite-link">{publicUrl}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(publicUrl)
+                  setCopied(true)
+                }}
+              >
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+            </>
+          )}
+        </section>
       )}
 
       {canManage && (

@@ -13,12 +13,13 @@ import type {
 } from '../lib/types'
 
 const COLUMNS =
-  'id, group_id, name, description, plan, starts_on, ends_on, created_by, created_at'
+  'id, group_id, is_public, name, description, plan, starts_on, ends_on, created_by, created_at'
 
 function toTrip(row: TripRow): Trip {
   return {
     id: row.id,
     groupId: row.group_id,
+    isPublic: row.is_public,
     name: row.name,
     description: row.description,
     plan: row.plan,
@@ -130,6 +131,23 @@ export async function updateTrip(id: string, patch: TripInput): Promise<Trip> {
       starts_on: patch.startsOn ?? null,
       ends_on: patch.endsOn ?? null,
     })
+    .eq('id', id)
+    .select(COLUMNS)
+    .single()
+
+  if (error) throw error
+  return toTrip(data as TripRow)
+}
+
+/**
+ * Publish or unpublish. Owner-only, enforced by trips_visibility_guard - the update policy
+ * lets anybody who manages the trip reach the row, and RLS cannot say "every column but
+ * this one", so a refusal here arrives as the trigger's message rather than zero rows.
+ */
+export async function setTripVisibility(id: string, isPublic: boolean): Promise<Trip> {
+  const { data, error } = await supabase
+    .from('trips')
+    .update({ is_public: isPublic })
     .eq('id', id)
     .select(COLUMNS)
     .single()

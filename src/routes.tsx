@@ -10,6 +10,7 @@ import GroupDetail from './pages/GroupDetail'
 import JoinGroup from './pages/JoinGroup'
 import Profile from './pages/Profile'
 import Admin from './pages/Admin'
+import PublicTrip from './pages/PublicTrip'
 
 // HashRouter, not BrowserRouter: GitHub Pages has no rewrite rule, so refreshing on a
 // deep path would 404.
@@ -18,6 +19,8 @@ export default function AppRoutes() {
     <HashRouter>
       <Routes>
         <Route path="/" element={<SignIn />} />
+        {/* Outside RequireAuth on purpose: a shared trip is readable without an account. */}
+        <Route path="/t/:id" element={<PublicTrip />} />
         <Route element={<RequireAuth />}>
           <Route path="/trips" element={<Trips />} />
           <Route path="/trips/:id" element={<TripDetail />} />

@@ -33,6 +33,7 @@ export interface Profile {
 export interface TripRow {
   id: string
   group_id: string
+  is_public: boolean
   name: string
   description: string | null
   plan: string | null
@@ -46,6 +47,8 @@ export interface Trip {
   id: string
   /** The group the trip belongs to. Immutable: a trip never moves to another group. */
   groupId: string
+  /** Published: anyone with the link sees the trip and its cars, but nobody's name. */
+  isPublic: boolean
   name: string
   description: string | null
   plan: string | null
@@ -58,6 +61,29 @@ export interface Trip {
 /** How the trips list reads a trip: the card says which group it is in. */
 export interface TripWithGroup extends Trip {
   groupName: string
+}
+
+// 022_public_trips.sql
+// What a published trip looks like to somebody who is not signed in. This mirrors the
+// return shape of public_trip(), which is the entire public surface - no names, no seat
+// comments, no ids of people. Adding a field here means changing that function.
+export interface PublicTripCar {
+  title: string
+  description: string | null
+  features: string[]
+  seatCount: number
+  seatsTaken: number
+}
+
+export interface PublicTrip {
+  id: string
+  name: string
+  description: string | null
+  plan: string | null
+  startsOn: string | null
+  endsOn: string | null
+  peopleGoing: number
+  cars: PublicTripCar[]
 }
 
 // 007_bookings.sql
