@@ -56,6 +56,7 @@ migration before this phase was `011_admin_booking_insert.sql`. Applied so far:
 | 021 | 19 | `saved_cars` |
 | 022 | — | public trips: `trips.is_public`, `public_trip()`, visibility guard |
 | 023 | — | a car's driver can be another member, or a name with no account |
+| 024 | — | `trip_plan_points`: the itinerary, and it joins the public trip page |
 
 Half of those are fixes review found after the planned migration landed. That ratio is the
 argument for running `/review` on every task in this phase, not a sign something went wrong.

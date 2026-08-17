@@ -63,6 +63,33 @@ export interface TripWithGroup extends Trip {
   groupName: string
 }
 
+// 024_trip_plan.sql
+// One stop on the itinerary. Ordering is not stored: day, then time, then created_at, both
+// in the SQL and in the API module - see the migration for why there is no sort column.
+export interface TripPlanPointRow {
+  id: string
+  trip_id: string
+  day: number
+  /** 'HH:MM:SS' as Postgres returns `time`, or null for a stop with no time yet. */
+  at_time: string | null
+  title: string
+  url: string | null
+  created_at: string
+}
+
+export interface TripPlanPoint {
+  id: string
+  tripId: string
+  /** 1-based. Day 1 is the trip's first day, whether or not startsOn is known. */
+  day: number
+  /** 'HH:MM', trimmed from Postgres's 'HH:MM:SS'. Null sorts to the end of its day. */
+  atTime: string | null
+  title: string
+  /** Checked to start with http:// or https:// by the database - it becomes an href. */
+  url: string | null
+  createdAt: string
+}
+
 // 022_public_trips.sql
 // What a published trip looks like to somebody who is not signed in. This mirrors the
 // return shape of public_trip(), which is the entire public surface - no names, no seat
@@ -75,6 +102,14 @@ export interface PublicTripCar {
   seatsTaken: number
 }
 
+/** A stop as the public page sees it: no id, because there is nothing to act on. */
+export interface PublicTripPoint {
+  day: number
+  atTime: string | null
+  title: string
+  url: string | null
+}
+
 export interface PublicTrip {
   id: string
   name: string
@@ -83,6 +118,7 @@ export interface PublicTrip {
   startsOn: string | null
   endsOn: string | null
   peopleGoing: number
+  planPoints: PublicTripPoint[]
   cars: PublicTripCar[]
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getPublicTrip } from '../api/publicTrips'
+import { groupByDay, planDayLabel } from '../components/TripPlan'
 import { useAuth } from '../auth/AuthProvider'
 import { errorMessage } from '../lib/errors'
 import type { PublicTrip as PublicTripData } from '../lib/types'
@@ -79,9 +80,39 @@ export default function PublicTrip() {
         {seatsTaken} of {seatsTotal} {seatsTotal === 1 ? 'seat' : 'seats'} taken
       </p>
 
-      {trip.plan && (
+      {trip.planPoints.length > 0 && (
         <>
           <h2>Plan</h2>
+          {groupByDay(trip.planPoints).map(({ day, points }) => (
+            <section key={day}>
+              <h3>{planDayLabel(day, trip.startsOn)}</h3>
+              <ul className="people">
+                {points.map((point, i) => (
+                  // No id to key on - public_trip() returns none, on purpose - and day plus
+                  // index is stable for a list that never reorders on this page.
+                  <li key={`${day}-${i}`} className="person">
+                    <span>
+                      {point.atTime ? <strong>{point.atTime}</strong> : null} {point.title}
+                      {point.url && (
+                        <>
+                          {' '}
+                          <a href={point.url} target="_blank" rel="noreferrer">
+                            map
+                          </a>
+                        </>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
+      )}
+
+      {trip.plan && (
+        <>
+          <h2>Notes</h2>
           <p className="prewrap">{trip.plan}</p>
         </>
       )}

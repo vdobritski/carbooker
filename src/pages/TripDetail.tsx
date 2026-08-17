@@ -17,6 +17,7 @@ import BookingForm from '../components/BookingForm'
 import CarCard from '../components/CarCard'
 import ParticipantList from '../components/ParticipantList'
 import SeatGrid from '../components/SeatGrid'
+import TripPlan from '../components/TripPlan'
 import type { BookingWithOccupant } from '../lib/types'
 import { managesTrip } from '../lib/authority'
 import { errorMessage } from '../lib/errors'
@@ -243,8 +244,12 @@ export default function TripDetail() {
             onChange={(e) => setDescription(e.target.value)}
           />
 
-          <label htmlFor="plan">Plan</label>
+          <label htmlFor="plan">Notes</label>
           <textarea id="plan" rows={6} value={plan} onChange={(e) => setPlan(e.target.value)} />
+          <span className="muted">
+            Anything that is not a stop on the plan. The stops themselves are on the trip
+            page.
+          </span>
 
           <button type="submit" className="primary" disabled={busy}>
             {busy ? 'Saving…' : 'Save'}
@@ -269,9 +274,13 @@ export default function TripDetail() {
 
       {trip.description && <p>{trip.description}</p>}
 
+      <TripPlan tripId={trip.id} startsOn={trip.startsOn} canManage={canManage} />
+
+      {/* `trips.plan` is free text and predates the itinerary above. It reads as the notes
+          the stops have no column for, so it keeps its content and loses its old name. */}
       {trip.plan && (
         <>
-          <h2>Plan</h2>
+          <h2>Notes</h2>
           <p className="prewrap">{trip.plan}</p>
         </>
       )}

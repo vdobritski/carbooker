@@ -241,6 +241,29 @@ list* — a person can be a participant before they hold a seat.
 
 Primary key `(trip_id, profile_id)`.
 
+### `trip_plan_points` — the itinerary (**024**)
+
+| column | type | notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `trip_id` | uuid not null | `references trips(id) on delete cascade` |
+| `day` | int not null default 1 | `check (day > 0)` — 1-based, not a date |
+| `at_time` | time | null while the time is not fixed |
+| `title` | text not null | "Arrive in Hrodna" |
+| `url` | text | `check` it starts `http://` or `https://` — it is rendered as an href |
+| `created_at` | timestamptz | breaks ties between two stops at the same time |
+
+There is **no sort column**. Stops read in `day, at_time nulls last, created_at` order, which
+is the order somebody writing an itinerary already has in their head; a stop with no time
+sits at the end of its day, where it reads as "not placed yet". Reordering is done by
+changing a time, not by dragging.
+
+`day` is a number rather than a date so a trip can be planned before its dates are set. The
+screen adds the real date beside "Day 2" whenever `trips.starts_on` is known.
+
+`trips.plan` is untouched by this. It is free text that predates the itinerary and now reads
+as the trip's **notes** — what the stops have no column for. Nothing was migrated out of it.
+
 ### `cars`
 
 | column | type | notes |
@@ -451,6 +474,7 @@ an owner who drives ticks their own travel role like anybody else.
 | `trips` | `is_group_member(group_id)` | `created_by = auth.uid()` and `can_create_trips_in(group_id)` | `created_by = auth.uid()`, or `can_manage_trips_in(group_id)` | same as update |
 | `trip_participants` | `is_group_member(trip_group(trip_id))` | self and member, or `manages_trip(trip_id)` | — | self, or `manages_trip(trip_id)` |
 | `cars` | `is_group_member(trip_group(trip_id))` | `driver_id = auth.uid()` and `can_drive_in_group(...)` — **or** `manages_trip(trip_id)`, which is what allows naming somebody else (**023**) | driver, or `manages_trip` | driver, or `manages_trip` |
+| `trip_plan_points` | `is_group_member(trip_group(trip_id))` | `manages_trip(trip_id)` | same | same |
 | `bookings` | `is_group_member(trip_group(trip_id))` | member, and `booked_by = auth.uid()` with occupant self or own guest — or `owns_car(car_id)`, or `manages_trip` | see below | `booked_by = auth.uid()`, or `manages_trip` |
 
 `groups` update is owner-only for a reason beyond taste: `owner_id` lives on that row, so
