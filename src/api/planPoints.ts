@@ -5,10 +5,9 @@ const COLUMNS = 'id, trip_id, day, at_time, title, url, sort_order, created_at'
 
 /**
  * Postgres returns a `time` as 'HH:MM:SS'; an <input type="time"> wants 'HH:MM' and shows
- * nothing at all for the longer form. Exported because the public page reads the same
- * values out of public_trip()'s json rather than through this module.
+ * nothing at all for the longer form.
  */
-export function shortTime(value: string | null): string | null {
+function shortTime(value: string | null): string | null {
   return value === null ? null : value.slice(0, 5)
 }
 

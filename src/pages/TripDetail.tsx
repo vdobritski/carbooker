@@ -497,8 +497,8 @@ export default function TripDetail() {
               </label>
 
               <p className="muted">
-                They see the trip, its cars and how many seats are taken — never who is going,
-                who drives, or anything written in a seat comment.
+                They see the trip, its notes, its cars and how many seats are taken — never
+                the plan, who is going, who drives, or anything written in a seat comment.
               </p>
 
               {trip.isPublic && (

@@ -106,14 +106,6 @@ export interface PublicTripCar {
   seatsTaken: number
 }
 
-/** A stop as the public page sees it: no id, because there is nothing to act on. */
-export interface PublicTripPoint {
-  day: number
-  atTime: string | null
-  title: string
-  url: string | null
-}
-
 export interface PublicTrip {
   id: string
   name: string
@@ -122,7 +114,6 @@ export interface PublicTrip {
   startsOn: string | null
   endsOn: string | null
   peopleGoing: number
-  planPoints: PublicTripPoint[]
   cars: PublicTripCar[]
 }
 

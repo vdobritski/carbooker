@@ -16,7 +16,7 @@ import type { TripPlanPoint } from '../lib/types'
  * `new Date('2026-08-17')` plus 24h: the string is a plain date, and parsing it as an
  * instant lands on the previous day in any timezone behind UTC.
  */
-export function planDayLabel(day: number, startsOn: string | null): string {
+function planDayLabel(day: number, startsOn: string | null): string {
   if (!startsOn) return `Day ${day}`
   const [y, m, d] = startsOn.split('-').map(Number)
   if (!y || !m || !d) return `Day ${day}`
@@ -25,7 +25,7 @@ export function planDayLabel(day: number, startsOn: string | null): string {
 }
 
 /** Points in reading order, split into their days. The order within a day is the query's. */
-export function groupByDay<T extends { day: number }>(points: T[]): { day: number; points: T[] }[] {
+function groupByDay<T extends { day: number }>(points: T[]): { day: number; points: T[] }[] {
   const days: { day: number; points: T[] }[] = []
   for (const point of points) {
     const last = days[days.length - 1]

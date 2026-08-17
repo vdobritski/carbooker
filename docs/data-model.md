@@ -263,6 +263,11 @@ it needs somewhere to put the answer. Consequences, both deliberate:
 - **editing a time moves nothing.** Once the order is somebody's own, an edit that re-sorted
   the day would silently undo a drag.
 
+Stops are **not** public. **024** put them in `public_trip()` and **027** took them back
+out: where a group of people will be and when is a different thing to publish than how full
+the cars are, and whoever holds a share link is not necessarily coming. `trips.plan` — the
+free-text notes — stays public, as it has been since **022**.
+
 `reorder_plan_points(uuid[])` writes a whole day in one request. It is **security invoker**,
 so the `manages_trip` update policy is still what decides, and it returns the row count —
 RLS filters rows rather than raising, so without the count a passenger dragging a stop would

@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase'
-import { shortTime } from './planPoints'
 import type { PublicTrip } from '../lib/types'
 
 /** The raw shape public_trip() returns. snake_case, like every other row in this codebase. */
@@ -11,12 +10,6 @@ interface PublicTripPayload {
   starts_on: string | null
   ends_on: string | null
   people_going: number
-  plan_points: {
-    day: number
-    at_time: string | null
-    title: string
-    url: string | null
-  }[]
   cars: {
     title: string
     description: string | null
@@ -57,12 +50,6 @@ export async function getPublicTrip(id: string): Promise<PublicTrip | null> {
     startsOn: payload.starts_on,
     endsOn: payload.ends_on,
     peopleGoing: payload.people_going,
-    planPoints: (payload.plan_points ?? []).map((p) => ({
-      day: p.day,
-      atTime: shortTime(p.at_time),
-      title: p.title,
-      url: p.url,
-    })),
     cars: (payload.cars ?? []).map((car) => ({
       title: car.title,
       description: car.description,
