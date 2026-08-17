@@ -18,6 +18,7 @@ import CarCard from '../components/CarCard'
 import ParticipantList from '../components/ParticipantList'
 import SeatGrid from '../components/SeatGrid'
 import type { BookingWithOccupant } from '../lib/types'
+import { managesTrip } from '../lib/authority'
 import { errorMessage } from '../lib/errors'
 import { DateRange } from './Trips'
 
@@ -94,11 +95,8 @@ export default function TripDetail() {
 
   const currentUserId = session?.user.id ?? null
   const isAdmin = profile?.role === 'admin'
-  // The branches of the trips_update policy, in the same order: my own trip, or
-  // can_manage_trips_in() - which is the switch, the group owner, and a site admin.
-  const canManageInGroup =
-    myGroupRights?.canManageTrips === true || myGroupRights?.isOwner === true || isAdmin
-  const canManage = trip.createdBy === currentUserId || canManageInGroup
+  // The same question the database asks in manages_trip(), asked once - see lib/authority.
+  const canManage = managesTrip(trip, myGroupRights, currentUserId, isAdmin)
   // Publishing exposes the group to the open internet, so it is the owner's call rather
   // than any trip manager's - trips_visibility_guard enforces the same rule.
   const canPublish = myGroupRights?.isOwner === true || isAdmin
@@ -260,7 +258,7 @@ export default function TripDetail() {
         participants={participants}
         creatorId={trip.createdBy}
         currentUserId={currentUserId}
-        canRemove={isAdmin}
+        canRemove={canManage}
         onRemove={(profileId) => withBusy(() => removeParticipant(trip.id, profileId))}
       />
 

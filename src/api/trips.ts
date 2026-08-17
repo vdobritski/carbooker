@@ -166,6 +166,19 @@ export async function deleteTrip(id: string): Promise<void> {
   }
 }
 
+/**
+ * Just enough to answer "may I run this trip?" — for a page that is about something on a
+ * trip rather than the trip itself. Two queries instead of getTripBoard's five, because
+ * CarDetail has no use for the participant list or every seat on the trip.
+ */
+export async function getTripAuthority(
+  tripId: string,
+): Promise<{ trip: Trip; rights: GroupRights | null } | null> {
+  const trip = await getTrip(tripId)
+  if (!trip) return null
+  return { trip, rights: await getMyGroupRights(trip.groupId) }
+}
+
 // --- the whole trip in one go ----------------------------------------------
 
 export interface TripBoard {
@@ -279,6 +292,8 @@ export async function removeParticipant(tripId: string, profileId: string): Prom
 
   if (error) throw error
   if (!data || data.length === 0) {
-    throw new Error('Participant was not removed - only an admin can remove someone else.')
+    throw new Error(
+      'They were not removed - that needs "can manage anyone\'s trip" in the group, or to be your own trip.',
+    )
   }
 }

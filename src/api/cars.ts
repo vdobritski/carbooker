@@ -112,6 +112,8 @@ export async function deleteCar(id: string): Promise<void> {
   const { data, error } = await supabase.from('cars').delete().eq('id', id).select('id')
   if (error) throw error
   if (!data || data.length === 0) {
-    throw new Error('Car was not deleted - only its driver or an admin can do that.')
+    throw new Error(
+      'Car was not deleted - that needs to be your car, or "can manage anyone\'s trip" in the group.',
+    )
   }
 }

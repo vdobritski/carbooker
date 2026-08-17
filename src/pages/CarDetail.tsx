@@ -8,9 +8,12 @@ import {
   listCarSeats,
   unassign,
 } from '../api/bookings'
+import { getTripAuthority } from '../api/trips'
+import type { GroupRights } from '../api/groups'
 import { useAuth } from '../auth/AuthProvider'
 import AssignPanel from '../components/AssignPanel'
-import type { BookingWithOccupant, CarWithDriver } from '../lib/types'
+import type { BookingWithOccupant, CarWithDriver, Trip } from '../lib/types'
+import { managesTrip } from '../lib/authority'
 import { errorMessage } from '../lib/errors'
 
 export default function CarDetail() {
@@ -22,6 +25,28 @@ export default function CarDetail() {
   const [car, setCar] = useState<CarWithDriver | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Who runs the trip decides who may manage its cars and seats, not just who drives.
+  const [trip, setTrip] = useState<Trip | null>(null)
+  const [rights, setRights] = useState<GroupRights | null>(null)
+
+  useEffect(() => {
+    if (!tripId) return
+    let cancelled = false
+    getTripAuthority(tripId)
+      .then((found) => {
+        if (cancelled || !found) return
+        setTrip(found.trip)
+        setRights(found.rights)
+      })
+      .catch((err: unknown) => {
+        // Not fatal: the page still renders, with the driver's own controls only.
+        if (!cancelled) setError(errorMessage(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tripId])
 
   useEffect(() => {
     if (!carId) return
@@ -108,7 +133,14 @@ export default function CarDetail() {
     )
   }
 
-  const canManage = profile?.role === 'admin' || car.driverId === session?.user.id
+  // The branches of cars_update / cars_delete / bookings_update, in the same order:
+  // I drive this car, or I run the trip it is on.
+  const currentUserId = session?.user.id ?? null
+  const isAdmin = profile?.role === 'admin'
+  const canManage =
+    car.driverId === currentUserId ||
+    (trip !== null && managesTrip(trip, rights, currentUserId, isAdmin)) ||
+    isAdmin
 
   async function remove() {
     if (!carId) return
